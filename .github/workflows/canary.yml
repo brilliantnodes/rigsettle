@@ -1,0 +1,28 @@
+name: Canary
+
+# Runs three fictional rentals (steady, 60%, no-show) against the deployed
+# contract every day and fails if an outcome changes. Can also be started by hand.
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install genlayer-py==0.18.0
+      - run: python tools/canary.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: canary-results
+          path: canary_results.json

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RigSettle: hashrate rentals settled by validators</title>
+    <meta name="description" content="Rent hashrate without trusting the other side. The payment is locked in a GenLayer Intelligent Contract, validators read the buyer's pool, and code splits the escrow by what was delivered." />
+    <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <img src="./logo.svg" alt="" width="40" height="40" />
+        <div>
+          <h1>RigSettle</h1>
+          <p class="sub">Hashrate rentals, settled by validators</p>
+        </div>
+      </div>
+      <div class="net" id="net"></div>
+    </header>
+
+    <main>
+      <section class="card hero">
+        <p class="hook">You rented <b>10&nbsp;GH/s</b>. You got <b>6</b>. Who decides what you owe?</p>
+        <p>
+          With RigSettle the buyer's payment is locked in a GenLayer Intelligent Contract. The seller's rigs mine to the <b>buyer's pool</b>,
+          so the pool's public worker page is a meter neither side can edit. When the rental ends, each validator reads that page and copies the
+          per-slot numbers into a fixed form. Plain code, not a model, works out the delivered share and splits the escrow.
+        </p>
+        <ol class="flow">
+          <li><strong>Lock</strong><span>The buyer locks the price. Validators check the pool page can be read. The seller locks a bond.</span></li>
+          <li><strong>Mine</strong><span>The seller's rigs mine to the buyer's pool for the agreed window.</span></li>
+          <li><strong>Settle</strong><span>Validators copy the pool's numbers and must agree within 2 points. The seller gets the delivered share; the buyer gets the rest.</span></li>
+        </ol>
+        <p class="small">Test GEN on GenLayer Studio only. Every pool, worker and coin in the examples is fictional.</p>
+      </section>
+
+      <section class="card" aria-labelledby="video-h" id="video-card" hidden>
+        <h2 id="video-h">See it in 45 seconds</h2>
+        <video controls preload="metadata" playsinline width="100%" poster="./video-poster.jpg" aria-label="RigSettle demo with on-screen captions and no sound.">
+          <source src="./rigsettle-demo.mp4" type="video/mp4" />
+        </video>
+        <p class="small" id="video-note">Captions are on screen. There is no sound.</p>
+      </section>
+
+      <section class="card" aria-labelledby="acct-h">
+        <h2 id="acct-h">1. Accounts</h2>
+        <p class="small">
+          Play both parties in this browser, or connect MetaMask for one role. Temporary accounts are made in this browser only, hold test GEN from
+          Studio's built-in faucet, and are worth nothing.
+        </p>
+        <div class="accounts">
+          <div class="acct" data-role="buyer">
+            <h3>Buyer</h3>
+            <p class="addr" id="buyer-addr">No account</p>
+            <p class="small" id="buyer-bal"></p>
+            <div class="row">
+              <button type="button" class="secondary" data-temp="buyer">Temporary account</button>
+              <button type="button" class="secondary" data-mm="buyer">MetaMask</button>
+              <button type="button" class="link" data-fund="buyer">Get 100 test GEN</button>
+            </div>
+          </div>
+          <div class="acct" data-role="seller">
+            <h3>Seller</h3>
+            <p class="addr" id="seller-addr">No account</p>
+            <p class="small" id="seller-bal"></p>
+            <div class="row">
+              <button type="button" class="secondary" data-temp="seller">Temporary account</button>
+              <button type="button" class="secondary" data-mm="seller">MetaMask</button>
+              <button type="button" class="link" data-fund="seller">Get 100 test GEN</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <button type="button" id="btn-both">Play both parties (two funded temporary accounts)</button>
+        </div>
+        <p class="error" id="acct-error" hidden></p>
+      </section>
+
+      <section class="card" aria-labelledby="new-h">
+        <h2 id="new-h">2. New rental (buyer)</h2>
+        <div class="examples">
+          <span class="small">Fill in a fictional example:</span>
+          <button type="button" class="link" data-preset="steady">Steady rig</button>
+          <button type="button" class="link" data-preset="sixty">Rig delivering 60%</button>
+          <button type="button" class="link" data-preset="outage">Pool outage</button>
+          <button type="button" class="link" data-preset="ghost">Seller never shows</button>
+          <button type="button" class="link" data-preset="dark">Pool page goes dark</button>
+        </div>
+        <p class="small" id="preset-note"></p>
+        <form id="form" novalidate>
+          <div class="grid">
+            <label>Seller address<input id="f-seller" type="text" maxlength="42" placeholder="0x… (filled from the seller account)" /></label>
+            <label>Pool name, as shown on its pages<input id="f-pool" type="text" maxlength="80" /></label>
+            <label>Worker name<input id="f-worker" type="text" maxlength="80" /></label>
+            <label>Pool's worker page (the meter)<input id="f-meter" type="url" maxlength="300" inputmode="url" /></label>
+            <label>Hashrate (GH/s)<input id="f-rate" type="number" min="0.000000001" step="any" /></label>
+            <label>Window start (your local time)<input id="f-start" type="datetime-local" step="60" /></label>
+            <label>Slot length (minutes)
+              <select id="f-slot"><option>1</option><option>5</option><option>10</option><option>15</option><option>30</option><option selected>60</option></select>
+            </label>
+            <label>Number of slots<input id="f-slots" type="number" min="3" max="96" step="1" /></label>
+            <label>Price (GEN, locked now)<input id="f-price" type="number" min="0" step="any" /></label>
+            <label>Seller's bond (GEN)<input id="f-bond" type="number" min="0" step="any" /></label>
+          </div>
+          <details class="adv">
+            <summary>More terms</summary>
+            <div class="grid">
+              <label>Pool status site (outage reports must start with this)<input id="f-status" type="url" maxlength="300" inputmode="url" placeholder="https://status.pool.example/" /></label>
+              <label>Grace for pool noise (%)<input id="f-grace" type="number" min="0" max="10" step="0.01" /></label>
+              <label>Evidence window after the end (minutes)<input id="f-evidence" type="number" min="0" max="1440" step="1" /></label>
+              <label>Default rule after the end (minutes)<input id="f-default" type="number" min="10" max="10080" step="1" /></label>
+            </div>
+            <p class="small">The seller must accept before the window starts. Settlement opens one slot after the window ends and after the evidence window.</p>
+          </details>
+          <p class="error" id="form-error" hidden></p>
+          <button type="submit" id="btn-create">Lock the price and create</button>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="ag-h" id="ag-card">
+        <h2 id="ag-h">3. The agreement</h2>
+        <div class="row">
+          <label class="inline">Agreement #<input id="ag-id" type="number" min="1" step="1" /></label>
+          <button type="button" class="secondary" id="btn-open">Open</button>
+          <button type="button" class="link" id="btn-reload">Reload</button>
+        </div>
+        <div id="ag-view"><p class="small">Create a rental above, or open one from the list below.</p></div>
+      </section>
+
+      <section class="card" id="life" hidden aria-live="polite">
+        <h2>Transaction</h2>
+        <p id="life-what" class="what"></p>
+        <ol class="steps" id="steps"></ol>
+        <p id="life-hash" class="small"></p>
+        <p id="life-note"></p>
+      </section>
+
+      <section class="card" aria-labelledby="rules-h">
+        <h2 id="rules-h">How settlement works</h2>
+        <p>The model only copies numbers. Every decision below is plain Python in the contract, and validators must reach the same answer.</p>
+        <table class="rules"><tbody id="rules"></tbody></table>
+        <p class="small">
+          A pool estimates hashrate from the shares it accepts, so a perfect rig shows a little noise; the grace band absorbs it. An outage excuses the
+          seller only if the status site named in the terms reports it <em>and</em> the meter shows the drop in the same slots. A page that cannot be read
+          moves nothing. Payouts are sent when the settlement transaction is finalized, after GenLayer's appeal window.
+        </p>
+      </section>
+
+      <section class="card" aria-labelledby="recent-h">
+        <h2 id="recent-h">Recent agreements</h2>
+        <div class="row"><span class="small" id="recent-state">Loading…</span><button type="button" class="link" id="btn-recent">Refresh</button></div>
+        <div id="recent" class="recent"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p id="foot-contract"></p>
+      <p><a id="foot-repo" target="_blank" rel="noopener noreferrer">Source code (MIT)</a> · Built by Brilliant Nodes · Test GEN on Studio only · Fictional examples only</p>
+    </footer>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
