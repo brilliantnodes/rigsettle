@@ -302,7 +302,10 @@ async function send(who, functionName, args, value, what) {
     if (FINAL_BAD[st]) { final = { ok: false, st }; break; }
   }
   busy = false;
-  setButtons(true);
+  // The agreement's buttons stay disabled until it has been read again
+  // (see after()), so a stale button cannot be pressed twice.
+  refreshing = true;
+  $("btn-create").disabled = false;
   if (!final) {
     $("life-note").textContent = "Not settled after eight minutes. It may still complete; press Reload on the agreement later.";
     return null;
@@ -326,6 +329,7 @@ async function send(who, functionName, args, value, what) {
   return { hash, answer: ans };
 }
 
+let refreshing = false;
 function setButtons(on) {
   document.querySelectorAll("#ag-view button, #btn-create").forEach((b) => (b.disabled = !on));
 }
@@ -425,9 +429,11 @@ $("form").addEventListener("submit", async (e) => {
       try { current = await read("get_agreement", [String(id)]); break; } catch {}
       await new Promise((r) => setTimeout(r, 3000));
     }
+    refreshing = false;
     if (current && String(current.id) === String(id)) renderAgreement(current);
     else await openAgreement(id);
   }
+  refreshing = false;
   loadRecent();
 });
 
@@ -436,6 +442,7 @@ $("form").addEventListener("submit", async (e) => {
 let current = null;
 
 async function openAgreement(id) {
+  refreshing = false;
   try {
     current = await read("get_agreement", [String(id)]);
     renderAgreement(current);
@@ -504,7 +511,7 @@ function renderAgreement(a) {
   const btn = (label, fn, cls) => {
     const b = el("button", cls, label);
     b.type = "button";
-    b.disabled = busy;
+    b.disabled = busy || refreshing;
     b.addEventListener("click", fn);
     acts.append(b);
     return b;
@@ -513,6 +520,7 @@ function renderAgreement(a) {
   // Studio can answer a read with the state from just before the new
   // transaction, so keep reading until the agreement's history has moved.
   const after = async (res) => {
+    refreshing = true;
     const before = (a.history || []).length;
     for (let i = 0; i < 10; i++) {
       try {
@@ -522,6 +530,7 @@ function renderAgreement(a) {
       } catch {}
       await new Promise((r) => setTimeout(r, 3000));
     }
+    refreshing = false;
     renderAgreement(current);
     loadRecent();
   };
@@ -551,8 +560,10 @@ function renderAgreement(a) {
     // outage evidence, one per party
     const ev = a.evidence || {};
     for (const party of ["buyer", "seller"]) {
-      // Each party gets one report, so offer it only once the window has started.
-      if (!me[party] || ev[party] || now < T.start || now >= T.evidenceUntil || !t.status_prefix) continue;
+      // Each party gets one report, so offer it once the window has ended and
+      // incidents in it can be resolved (from the start if there is no evidence window).
+      const evidenceFrom = t.evidence_minutes > 0 ? T.end : T.start;
+      if (!me[party] || ev[party] || now < evidenceFrom || now >= T.evidenceUntil || !t.status_prefix) continue;
       const wrap = el("div", "actions");
       const inp = el("input", "url");
       inp.type = "url";
@@ -563,9 +574,11 @@ function renderAgreement(a) {
       b1.addEventListener("click", () => send(roles[party], "add_evidence", [a.id, inp.value.trim()], 0n, `Validators read the ${party}'s outage report`).then(after));
       const b2 = el("button", "link", "Waive");
       b2.type = "button";
+      b1.disabled = b2.disabled = busy || refreshing;
       b2.addEventListener("click", () => send(roles[party], "waive_evidence", [a.id], 0n, `The ${party} waives an outage report`).then(after));
       wrap.append(inp, b1, b2);
       extra.append(wrap);
+      extra.append(el("p", "small", `One outage report per party, read by the validators now. Use the status page that lists the incident. Open until ${utc(T.evidenceUntil)}.`));
     }
     // agreed split
     for (const party of ["buyer", "seller"]) {
@@ -576,6 +589,7 @@ function renderAgreement(a) {
       inp.setAttribute("aria-label", `Seller's share in percent (${party})`);
       const b = el("button", "secondary", `Propose this seller share (${party})`);
       b.type = "button";
+      b.disabled = busy || refreshing;
       b.addEventListener("click", () => {
         const bp = Math.round(parseFloat(inp.value) * 100);
         if (!(bp >= 0 && bp <= 10000)) return;
@@ -686,7 +700,7 @@ $("btn-reload").addEventListener("click", () => { if (current) openAgreement(cur
 // never change, and a refresh must not reset what the visitor is typing or
 // close a section they opened.
 setInterval(() => {
-  if (!current || busy || !["OPEN", "ACTIVE"].includes(current.state)) return;
+  if (!current || busy || refreshing || !["OPEN", "ACTIVE"].includes(current.state)) return;
   const view = $("ag-view");
   if (view.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
   const open = new Set([...view.querySelectorAll("details[open]")].map((d) => d.dataset.key));
@@ -719,6 +733,7 @@ async function settleReady(id) {
     } catch {}
     await new Promise((r) => setTimeout(r, 3000));
   }
+  refreshing = false;
   if (current) renderAgreement(current);
   $("ag-card").scrollIntoView({ behavior: "smooth", block: "start" });
   loadRecent();

@@ -89,10 +89,7 @@ def main():
         page.locator("#ag-view .badge.ACTIVE").wait_for(timeout=120000)
         res["steps"].append(("active", no_sideways(page)))
         if PRESET == "outage":
-            click_when(page, "Add outage report (seller)", 900)  # offered once the window has started
-            # Report after the window so both restarts in it are listed as resolved.
-            page.wait_for_function("() => /The window has ended|Settlement opens/.test(document.querySelector('#ag-view .next').textContent)", timeout=900000)
-            click_when(page, "Add outage report (seller)", 60)
+            click_when(page, "Add outage report (seller)", 1200)  # offered once the window has ended
             log("evidence: " + wait_tx(page))
             click_when(page, "Waive", 120)
             log("buyer waives: " + wait_tx(page))
