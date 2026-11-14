@@ -83,7 +83,7 @@ Hosted with the site under [`/demo/`](https://rigsettle.brilliantnodes.com/demo/
 | Saltmarsh status page | lists each stratum restart (two minutes, every five minutes) and some website-only notices |
 | Quillmoor `rig-dark` | readable, but the statistics service is down 6–9 minutes past every ten |
 
-Demo rentals use five 1-minute slots so a full lifecycle takes about 12 minutes; **Ready to settle now** skips the wait. Real rentals use hourly slots (see `examples/terms-hourly.example.json`).
+Demo rentals use five 1-minute slots so a full lifecycle takes about 15 minutes; **Ready to settle now** skips the wait. Real rentals use hourly slots (see `examples/terms-hourly.example.json`).
 
 LIVE_RESULTS_PLACEHOLDER
 

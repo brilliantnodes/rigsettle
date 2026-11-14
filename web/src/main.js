@@ -346,8 +346,9 @@ const PRESETS = {
 };
 
 function presetStart(align10) {
-  // Leave about four minutes for the probe (usually under a minute) and the acceptance.
-  let m = Math.ceil((nowS() + 4 * 60) / 60);
+  // Leave about six minutes for the probe (usually under a minute, longer
+  // when Studio is busy) and the acceptance.
+  let m = Math.ceil((nowS() + 6 * 60) / 60);
   if (align10) while (m % 10) m++;
   return m * 60;
 }
@@ -368,7 +369,7 @@ document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("cl
   $("f-evidence").value = "2";
   $("f-default").value = "12";
   if (roles.seller) $("f-seller").value = roles.seller.address;
-  $("preset-note").textContent = `${p.note} The window is five 1-minute slots so the demo finishes in about 12 minutes. Real rentals use hourly slots. To watch a settlement right away, use a rental under "Ready to settle now" instead.`;
+  $("preset-note").textContent = `${p.note} The window is five 1-minute slots so the demo finishes in about 15 minutes. Real rentals use hourly slots. To watch a settlement right away, use a rental under "Ready to settle now" instead.`;
 }));
 
 function formError(msg) {
