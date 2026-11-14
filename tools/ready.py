@@ -5,8 +5,9 @@ validators settle it in a few minutes instead of waiting for a new window.
 Runs every hour from .github/workflows/ready.yml:
 
   1. Tidy up: any agreement still ACTIVE whose settlement has been open for
-     70 minutes is settled (anyone may call settle), any agreement past its
-     default cut-off gets the default rule, and any unaccepted agreement
+     70 minutes, or whose default cut-off has passed, is settled from the
+     pool page (anyone may call settle); only if the page gives no reading
+     after the cut-off is the default rule applied. Any unaccepted agreement
      past its acceptance deadline is expired. Nobody's money stays locked.
   2. Create a new "rig delivering about 60%" rental between two fresh
      throwaway Studio accounts, probe the meter, accept, and waive outage
@@ -49,12 +50,14 @@ def tidy(c):
             if a["state"] == "OPEN" and now > a["terms"]["accept_by"]:
                 tx, r = write(c, ADDR, "expire", [aid])
                 print(f"#{aid} expired: {r['status']}")
-            elif a["state"] == "ACTIVE" and now >= cutoff:
-                tx, r = write(c, ADDR, "settle_default", [aid])
-                print(f"#{aid} default rule: {r['status']} {r['result']}")
-            elif a["state"] == "ACTIVE" and now >= opens + STALE_AFTER:
+            elif a["state"] == "ACTIVE" and (now >= cutoff or now >= opens + STALE_AFTER):
+                # A real reading first; the default rule only if the page gives none.
                 tx, r = write(c, ADDR, "settle", [aid])
                 print(f"#{aid} settled by the hourly job: {r['status']} {r['result']}")
+                res = r["result"] if isinstance(r["result"], dict) else {}
+                if not res.get("settled") and now >= cutoff:
+                    tx, r = write(c, ADDR, "settle_default", [aid])
+                    print(f"#{aid} default rule: {r['status']} {r['result']}")
         except Exception as e:  # one stuck agreement must not stop the rest
             print(f"#{aid} not tidied: {str(e)[:200]}")
 

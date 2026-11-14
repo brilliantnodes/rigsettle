@@ -37,10 +37,13 @@ def no_sideways(page):
 
 
 def click_when(page, name, timeout_s):
-    btn = page.get_by_role("button", name=name)
-    btn.first.wait_for(state="visible", timeout=timeout_s * 1000)
-    page.wait_for_function("b => !b.disabled", arg=btn.first.element_handle(), timeout=timeout_s * 1000)
-    btn.first.click()
+    """Click the first visible, enabled button whose text starts with name.
+    The site redraws the agreement after every transaction, so the button is
+    looked up again on every check instead of holding on to an old node."""
+    page.wait_for_function(
+        """name => [...document.querySelectorAll('button')].some(b => b.textContent.trim().startsWith(name) && !b.disabled && b.offsetParent)""",
+        arg=name, timeout=timeout_s * 1000)
+    page.locator("button:enabled", has_text=name).first.click()
 
 
 def wait_tx(page, timeout_s=480):
