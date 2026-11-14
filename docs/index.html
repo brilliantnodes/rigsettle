@@ -6,8 +6,9 @@
     <title>RigSettle: hashrate rentals settled by validators</title>
     <meta name="description" content="Rent hashrate without trusting the other side. The payment is locked in a GenLayer Intelligent Contract, validators read the buyer's pool, and code splits the escrow by what was delivered." />
     <link rel="icon" href="./logo.svg" type="image/svg+xml" />
-    <script type="module" crossorigin src="./assets/index-B4sODYFW.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BnfhJaNx.css">
+    <script type="module" crossorigin src="./assets/index-qBNlHzNr.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/genlayer-nFUEOS6W.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CsH3qxpQ.css">
   </head>
   <body>
     <header class="top">
@@ -76,7 +77,7 @@
         <div class="row">
           <button type="button" id="btn-both">Play both parties (two funded temporary accounts)</button>
         </div>
-        <p class="error" id="acct-error" hidden></p>
+        <p class="error" id="acct-error" role="alert" hidden></p>
       </section>
 
       <section class="card" aria-labelledby="new-h">
@@ -86,6 +87,7 @@
           <button type="button" class="link" data-preset="steady">Steady rig</button>
           <button type="button" class="link" data-preset="sixty">Rig delivering 60%</button>
           <button type="button" class="link" data-preset="outage">Pool outage</button>
+          <button type="button" class="link" data-preset="gappy">Pool hides idle minutes</button>
           <button type="button" class="link" data-preset="ghost">Seller never shows</button>
           <button type="button" class="link" data-preset="dark">Pool page goes dark</button>
         </div>
@@ -113,11 +115,17 @@
               <label>Evidence window after the end (minutes)<input id="f-evidence" type="number" min="0" max="1440" step="1" /></label>
               <label>Default rule after the end (minutes)<input id="f-default" type="number" min="10" max="10080" step="1" /></label>
             </div>
-            <p class="small">The seller must accept before the window starts. Settlement opens one slot after the window ends and after the evidence window.</p>
+            <p class="small">The seller must accept before the window starts. Settlement opens one slot after the window ends and after the evidence window. The pool's worker page should list every slot of the window, including idle ones: a slot it does not list counts as zero.</p>
           </details>
-          <p class="error" id="form-error" hidden></p>
+          <p class="error" id="form-error" role="alert" hidden></p>
           <button type="submit" id="btn-create">Lock the price and create</button>
         </form>
+      </section>
+
+      <section class="card" aria-labelledby="ready-h">
+        <h2 id="ready-h">Ready to settle now</h2>
+        <p class="small">Skip the wait: these fictional rentals have finished their window, so you can ask the validators to settle one right away.</p>
+        <div id="ready" class="ready" aria-live="polite"><p class="small">Loading…</p></div>
       </section>
 
       <section class="card" aria-labelledby="ag-h" id="ag-card">

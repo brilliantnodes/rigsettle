@@ -7,6 +7,19 @@ Studio keys; never use a key that holds anything of value.
   python tools/rs.py deploy                      # deploy contracts/rigsettle.py
   python tools/rs.py show <id>                   # print one agreement
   python tools/rs.py latest                      # list recent agreements
+
+A real rental from the command line (RS_KEY = the caller's key):
+
+  python tools/rs.py create terms.json           # buyer: lock the price
+  python tools/rs.py probe <id>                  # anyone: validators check the meter
+  python tools/rs.py accept <id>                 # seller: lock the bond
+  python tools/rs.py evidence <id> <url>         # buyer or seller: one outage report
+  python tools/rs.py waive <id>                  # buyer or seller: no outage report
+  python tools/rs.py settle <id>                 # anyone, once settlement opens
+  python tools/rs.py default <id>                # anyone, after the cut-off
+
+terms.json holds the frozen terms; see examples/terms-hourly.example.json.
+Times are UTC ISO strings, amounts are GEN, the hashrate is GH/s.
 """
 import json
 import os
@@ -107,6 +120,50 @@ def deploy():
     return addr
 
 
+def _ts(text: str) -> int:
+    from datetime import datetime
+    return int(datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp())
+
+
+def _wei(gen) -> int:
+    from decimal import Decimal
+    return int(Decimal(str(gen)) * G)
+
+
+def create_args(terms: dict) -> tuple:
+    """Terms file to the create() arguments and the price in wei."""
+    start = _ts(terms["start_utc"])
+    args = [
+        terms["seller"], terms["pool_name"], terms["worker_name"], terms["meter_url"], terms.get("status_prefix", ""),
+        int(round(float(terms["rate_ghs"]) * GH)), int(terms["slot_minutes"]), start, int(terms["slots"]),
+        _wei(terms["bond_gen"]), int(round(float(terms.get("grace_percent", 3)) * 100)),
+        _ts(terms.get("accept_by_utc", terms["start_utc"])), int(terms.get("evidence_minutes", 120)),
+        int(terms.get("default_after_minutes", 2880)),
+    ]
+    return args, _wei(terms["price_gen"])
+
+
+def act(addr: str, cmd: str, rest: list) -> None:
+    key = os.environ.get("RS_KEY")
+    if not key:
+        raise SystemExit("set RS_KEY to the key of the account that acts (a throwaway Studio key)")
+    c, acct = client(key)
+    if cmd == "create":
+        args, price = create_args(json.loads(Path(rest[0]).read_text()))
+        tx, r = write(c, addr, "create", args, value=price)
+    elif cmd == "accept":
+        bond = int(read(c, addr, "get_agreement", [rest[0]])["terms"]["bond"])
+        tx, r = write(c, addr, "accept", [rest[0]], value=bond)
+    else:
+        fn, args = {
+            "probe": ("probe_meter", rest[:1]), "settle": ("settle", rest[:1]), "default": ("settle_default", rest[:1]),
+            "waive": ("waive_evidence", rest[:1]), "evidence": ("add_evidence", rest[:2]), "cancel": ("cancel", rest[:1]),
+            "expire": ("expire", rest[:1]),
+        }[cmd]
+        tx, r = write(c, addr, fn, args)
+    print(json.dumps({"tx": tx, "status": r["status"], "result": r["result"]}, indent=2, default=str))
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -116,6 +173,9 @@ def main():
         deploy()
         return
     addr = os.environ.get("RS_ADDRESS") or DEFAULT_ADDRESS
+    if cmd in ("create", "probe", "accept", "evidence", "waive", "settle", "default", "cancel", "expire"):
+        act(addr, cmd, sys.argv[2:])
+        return
     c, _ = client()
     if cmd == "show":
         print(json.dumps(read(c, addr, "get_agreement", [sys.argv[2]]), indent=2, default=str))

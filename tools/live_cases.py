@@ -87,9 +87,16 @@ def run(name, cfg, start):
             log(name, f"expire {r['status']} {r['result']}")
         if cfg.get("flow") in ("cancel", "expire"):
             return finish(name, cfg, rec, cb, aid, buyer, seller)
-        tx, r = write(cs, ADDR, "probe_meter", [aid])
-        rec["txs"]["probe"] = tx
-        log(name, f"probe {r['status']} {r['result']}")
+        for attempt in range(3):
+            if cfg.get("dark"):
+                # The fictional dark page reads fine only 0-5 minutes past every ten.
+                while (int(time.time() // 60) % 10) >= 5:
+                    time.sleep(5)
+            tx, r = write(cs, ADDR, "probe_meter", [aid])
+            rec["txs"]["probe"] = tx
+            log(name, f"probe {r['status']} {r['result']}")
+            if isinstance(r["result"], dict) and r["result"].get("ok"):
+                break
         if cfg.get("flow") == "refund":
             tx, r = write(cs, ADDR, "accept", [aid], value=1 * G)
             rec["txs"]["accept_refused"] = tx

@@ -335,14 +335,15 @@ function setButtons(on) {
 const PRESETS = {
   steady: { pool: "Fernhollow Pool", worker: "rig-steady", path: "fernhollow/rig-steady", note: "A rig delivering about 10 GH/s with normal pool noise. Expected: paid in full." },
   sixty: { pool: "Fernhollow Pool", worker: "rig-sixty", path: "fernhollow/rig-sixty", note: "You rented 10 GH/s; the rig delivers about 6. Expected: about 60% of the price and of the bond to the seller." },
-  outage: { pool: "Saltmarsh Pool", worker: "rig-outage", path: "saltmarsh/rig-outage", align10: true, note: "The pool's stratum restarts at 3 to 5 minutes past every ten and lists it on its status page. Without an outage report the seller gets about 60%; with one, the drop is excused." },
+  outage: { pool: "Saltmarsh Pool", worker: "rig-outage", path: "saltmarsh/rig-outage", note: "The pool's stratum restarts every five minutes for two minutes and lists each restart on its status page, so every five-minute window has two dead minutes. Without an outage report the seller gets about 60%; with one, the drop is excused." },
+  gappy: { pool: "Fernhollow Pool", worker: "rig-gappy", path: "fernhollow/rig-gappy", note: "The rig mines only three of every five minutes, and this pool leaves minutes without shares off the page. A missing minute counts as zero, so the seller gets about 60%, not 100%." },
   ghost: { pool: "Fernhollow Pool", worker: "rig-ghost", path: "fernhollow/rig-ghost", note: "The worker never appears on the pool. Expected: the buyer gets the price and the whole bond." },
   dark: { pool: "Quillmoor Pool", worker: "rig-dark", path: "quillmoor/rig-dark", align10: true, note: "This fictional pool's statistics go down 6 to 9 minutes past every ten. The page reads fine at acceptance and is dark at settlement: nothing moves, and after the cut-off the default rule pays the seller, because the buyer controls the pool." },
 };
 
 function presetStart(align10) {
-  // Leave about six minutes for the probe and the acceptance.
-  let m = Math.ceil((nowS() + 6 * 60) / 60);
+  // Leave about four minutes for the probe (usually under a minute) and the acceptance.
+  let m = Math.ceil((nowS() + 4 * 60) / 60);
   if (align10) while (m % 10) m++;
   return m * 60;
 }
@@ -363,7 +364,7 @@ document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("cl
   $("f-evidence").value = "2";
   $("f-default").value = "12";
   if (roles.seller) $("f-seller").value = roles.seller.address;
-  $("preset-note").textContent = `${p.note} The window is five 1-minute slots so the demo finishes in about 15 minutes. Real rentals use hourly slots.`;
+  $("preset-note").textContent = `${p.note} The window is five 1-minute slots so the demo finishes in about 12 minutes. Real rentals use hourly slots. To watch a settlement right away, use a rental under "Ready to settle now" instead.`;
 }));
 
 function formError(msg) {
@@ -550,7 +551,8 @@ function renderAgreement(a) {
     // outage evidence, one per party
     const ev = a.evidence || {};
     for (const party of ["buyer", "seller"]) {
-      if (!me[party] || ev[party] || now >= T.evidenceUntil || !t.status_prefix) continue;
+      // Each party gets one report, so offer it only once the window has started.
+      if (!me[party] || ev[party] || now < T.start || now >= T.evidenceUntil || !t.status_prefix) continue;
       const wrap = el("div", "actions");
       const inp = el("input", "url");
       inp.type = "url";
@@ -611,6 +613,7 @@ function renderAgreement(a) {
   (a.attempts || []).forEach((x) => box.append(el("p", "small", `Settlement attempt at ${utcFull(x.at)}: no reading, because ${REASON_TEXT[x.reason] || x.reason}. Nothing moved.`)));
 
   const d = el("details");
+  d.dataset.key = "history";
   d.append(el("summary", null, `History (${(a.history || []).length} steps)`));
   const ul = el("ul", "timeline");
   (a.history || []).forEach((h) => ul.append(el("li", null, `${utcFull(h.at)} · ${h.action}${h.note ? " · " + h.note : ""} · by ${shortAddr(h.by)}`)));
@@ -635,27 +638,32 @@ function resultView(a) {
   const b2 = el("div"); b2.append(el("span", "small", "Seller receives"), el("b", null, gen(r.paid_seller)));
   pay.append(b1, b2);
   wrap.append(pay);
-  wrap.append(el("p", "small", "Payouts are sent when the settlement transaction is finalized, after GenLayer's appeal window (about a minute on Studio)."));
+  wrap.append(el("p", "small", "Payouts are sent when the settlement transaction is finalized, after GenLayer's appeal window (under a minute on Studio)."));
   const rd = r.reading;
-  if (rd && rd.kind === "READ" && rd.listed && rd.rows.length) {
+  if (rd && rd.kind === "READ" && rd.listed) {
     const t = a.terms;
     const rate = BigInt(t.rate_hs);
     const out = r.outages || [];
+    const byIndex = new Map(rd.rows.map(([i, v]) => [i, v]));
     const tbl = el("table", "slots");
+    const cap = el("caption", "small", "Every slot of the window. A slot the pool page did not list counts as zero.");
+    tbl.append(cap);
     const hr = el("tr");
-    ["Slot (UTC)", "Pool measured", "Counted"].forEach((h) => hr.append(el("th", null, h)));
+    ["Slot (UTC)", "Pool measured", "Counted"].forEach((h) => { const th = el("th", null, h); th.scope = "col"; hr.append(th); });
     tbl.append(hr);
-    rd.rows.forEach(([i, v]) => {
+    for (let i = 0; i < t.slots; i++) {
       const s0 = t.start_at + i * t.slot_minutes * 60;
       const down = out.some(([x, y]) => x < s0 + t.slot_minutes * 60 && y > s0);
-      const m = BigInt(v);
+      const listed = byIndex.has(i);
+      const m = listed ? BigInt(byIndex.get(i)) : 0n;
       const counted = down && m < rate ? `${ghs(rate)} (outage excused)` : ghs(m < rate ? m : rate) + (m > rate ? " (capped)" : "");
       const tr = el("tr");
-      tr.append(el("td", null, utc(s0)), el("td", null, ghs(m)), el("td", null, counted));
+      tr.append(el("td", null, utc(s0)), el("td", null, listed ? ghs(m) : "not on the page"), el("td", null, counted));
       tbl.append(tr);
-    });
+    }
     const d = el("details");
-    d.append(el("summary", null, `What the validators copied from the pool (${rd.rows.length} slots)`));
+    d.dataset.key = "copied";
+    d.append(el("summary", null, `What the validators copied from the pool (${rd.rows.length} of ${t.slots} slots listed)`));
     d.append(tbl);
     wrap.append(d);
   }
@@ -674,14 +682,76 @@ function linkTo(url) {
 
 $("btn-open").addEventListener("click", () => { const id = $("ag-id").value; if (id) openAgreement(id); });
 $("btn-reload").addEventListener("click", () => { if (current) openAgreement(current.id); });
-setInterval(() => { if (current && !busy) renderAgreement(current); }, 20000);
+// Refresh the time-dependent text of an open agreement. Closed agreements
+// never change, and a refresh must not reset what the visitor is typing or
+// close a section they opened.
+setInterval(() => {
+  if (!current || busy || !["OPEN", "ACTIVE"].includes(current.state)) return;
+  const view = $("ag-view");
+  if (view.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  const open = new Set([...view.querySelectorAll("details[open]")].map((d) => d.dataset.key));
+  renderAgreement(current);
+  view.querySelectorAll("details").forEach((d) => { if (open.has(d.dataset.key)) d.open = true; });
+}, 20000);
 
 // ------------------------------------------------------------ recent
+
+// ------------------------------------------------- ready to settle now
+
+async function ensureAnyAccount() {
+  if (roles.buyer || roles.seller) return roles.buyer || roles.seller;
+  tempAccount("buyer");
+  try { await faucet(roles.buyer.address); } catch {}
+  return roles.buyer;
+}
+
+async function settleReady(id) {
+  const who = await ensureAnyAccount();
+  $("ag-id").value = id;
+  await openAgreement(id);
+  const before = current ? (current.history || []).length : 0;
+  const res = await send(who, "settle", [String(id)], 0n, `Validators read the pool page and settle #${id}`);
+  for (let i = 0; i < 10; i++) {
+    try {
+      const fresh = await read("get_agreement", [String(id)]);
+      current = fresh;
+      if (!res || (fresh.history || []).length > before || fresh.state !== "ACTIVE") break;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  if (current) renderAgreement(current);
+  $("ag-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  loadRecent();
+}
+
+function showReady(list) {
+  const box = $("ready");
+  box.replaceChildren();
+  const now = nowS();
+  const ready = list.filter((a) => a.state === "ACTIVE" && now >= times(a).settleAt && now < times(a).cutoff).slice(0, 2);
+  if (!ready.length) {
+    box.append(el("p", "small", "No rental is ready this minute. A new one is created every hour and opens for settlement about ten minutes later. You can also create your own above."));
+    return;
+  }
+  ready.forEach((a) => {
+    const T = times(a);
+    const row = el("div", "ready-row");
+    row.append(el("span", null, `#${a.id} · ${a.terms.pool_name} · ${a.terms.worker_name} · window ${utc(T.start)} to ${utc(T.end)}`));
+    const b = el("button", null, `Settle #${a.id} now`);
+    b.type = "button";
+    b.disabled = busy;
+    b.addEventListener("click", () => settleReady(a.id));
+    row.append(b);
+    box.append(row);
+  });
+  box.append(el("p", "small", "Fictional rig delivering about 60%, created by an hourly job with two throwaway accounts. Settling uses a temporary account in this browser if you have none. The validators read the pool page in one to three minutes; the result appears below."));
+}
 
 async function loadRecent() {
   $("recent-state").textContent = "Loading…";
   try {
     const list = await read("get_latest", [20]);
+    showReady(list);
     const box = $("recent");
     box.replaceChildren();
     $("recent-state").textContent = list.length ? `${list.length} most recent, newest first.` : "No agreements yet.";
@@ -706,13 +776,14 @@ async function loadRules() {
     const rows = [
       ["Copy, don't judge", "Each validator copies the pool's per-slot accepted hashrate into a fixed form. Code does all the arithmetic."],
       ["S1 Cap", "Each slot counts at most the contracted rate. Over-delivery is never billed."],
-      ["S2 Pro rata", "Delivered share = counted hashrate ÷ (contracted rate × metered slots). Missing slots take the average of metered ones."],
+      ["S2 Pro rata", "Delivered share = counted hashrate ÷ (contracted rate × every slot of the window)."],
+      ["M1 Missing slot", `A slot the pool page does not list counts as ${r.missing_slot_counts_as}. Pools often leave idle intervals out, so averaging would pay for slots that were never mined.`],
       ["G1 Grace", `A shortfall within the agreed grace (up to ${r.max_grace_bp / 100}%) counts as full delivery.`],
-      ["X1 Outage", "A slot is excused only if an outage on the named status site covers it and the meter shows the drop."],
+      ["X1 Outage", "A slot is excused only if an outage on the named status site covers it and the meter shows the drop (a slot missing from the page counts as a drop)."],
       ["Z1 No-show", "A readable pool page that says the worker does not exist means nothing was delivered."],
-      ["N1 / N2 / C1 No reading", `An unreadable page, rows that don't fit the terms, or fewer than ${r.min_coverage_bp / 100}% of slots on the page: nothing moves, and anyone may retry.`],
+      ["N1 / N2 / C1 No reading", `An unreadable page, a row that cannot be read or does not fit the terms, or fewer than ${r.min_coverage_bp / 100}% of slots on the page: nothing moves, and anyone may retry.`],
       ["D1 / D2 Default", "After the cut-off: if the page was dark, the seller is paid (the buyer controls the pool); if nobody produced a reading, the buyer is refunded."],
-      ["Validator agreement", `Same outcome kind and reason, and raw shares within ${r.share_tolerance_bp / 100} percentage points.`],
+      ["Validator agreement", `Same outcome kind and reason, and raw shares within ${r.share_tolerance_bp / 100} percentage points; within ${r.grace_edge_tolerance_bp / 100} of a point where the grace rule would decide differently.`],
       ["Seller's bond", "Returned in proportion to the delivered share; the rest goes to the buyer."],
     ];
     const t = $("rules");

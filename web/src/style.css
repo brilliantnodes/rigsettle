@@ -4,7 +4,7 @@
   --ink: #14213d;
   --muted: #5b6477;
   --line: #dcd8cf;
-  --accent: #b86e00;
+  --accent: #9a5b00; /* 5.4:1 on white, WCAG AA for normal text */
   --good: #1f6f43;
   --good-bg: #e3f3ea;
   --bad: #a3271f;
@@ -175,3 +175,6 @@ label.inline input { width: 6.5rem; }
 @media (max-width: 640px) {
   .flow, .accounts, .grid, .payout { grid-template-columns: 1fr; }
 }
+.ready { display: grid; gap: 0.5rem; }
+.ready-row { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.75rem; }
+.slots caption { text-align: left; caption-side: top; }

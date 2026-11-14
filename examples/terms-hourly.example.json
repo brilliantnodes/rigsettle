@@ -1,0 +1,18 @@
+{
+  "_comment": "Fictional example of real-use terms: hourly slots, a 12-hour window. Replace every value; pool.example is not a real pool.",
+  "seller": "0x0000000000000000000000000000000000000001",
+  "pool_name": "Example Pool",
+  "worker_name": "rentals.rig07",
+  "meter_url": "https://pool.example/workers/rentals.rig07",
+  "status_prefix": "https://status.pool.example/",
+  "rate_ghs": 120,
+  "slot_minutes": 60,
+  "slots": 12,
+  "start_utc": "2026-12-01T06:00:00Z",
+  "accept_by_utc": "2026-12-01T05:00:00Z",
+  "price_gen": 25,
+  "bond_gen": 5,
+  "grace_percent": 3,
+  "evidence_minutes": 120,
+  "default_after_minutes": 2880
+}
