@@ -420,7 +420,12 @@ $("form").addEventListener("submit", async (e) => {
   }
   if (id) {
     $("ag-id").value = id;
-    await openAgreement(id);
+    for (let i = 0; i < 10; i++) {
+      try { current = await read("get_agreement", [String(id)]); break; } catch {}
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    if (current && String(current.id) === String(id)) renderAgreement(current);
+    else await openAgreement(id);
   }
   loadRecent();
 });
@@ -504,7 +509,21 @@ function renderAgreement(a) {
     return b;
   };
   const now = nowS();
-  const after = async () => openAgreement(a.id).then(loadRecent);
+  // Studio can answer a read with the state from just before the new
+  // transaction, so keep reading until the agreement's history has moved.
+  const after = async (res) => {
+    const before = (a.history || []).length;
+    for (let i = 0; i < 10; i++) {
+      try {
+        const fresh = await read("get_agreement", [String(a.id)]);
+        current = fresh;
+        if (!res || (fresh.history || []).length > before || fresh.state !== a.state) break;
+      } catch {}
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    renderAgreement(current);
+    loadRecent();
+  };
 
   if (a.state === "OPEN") {
     const p = a.probe;
