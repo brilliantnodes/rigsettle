@@ -766,8 +766,9 @@ function showReady(list) {
 async function loadRecent() {
   $("recent-state").textContent = "Loading…";
   try {
-    const list = await read("get_latest", [20]);
-    showReady(list);
+    const all = await read("get_latest", [50]); // the contract's maximum
+    showReady(all);
+    const list = all.slice(0, 20);
     const box = $("recent");
     box.replaceChildren();
     $("recent-state").textContent = list.length ? `${list.length} most recent, newest first.` : "No agreements yet.";
