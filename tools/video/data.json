@@ -1,0 +1,4 @@
+{"sixty": {"date": "2026-11-14", "minutes": ["09:20","09:21","09:22","09:23","09:24"], "rows_ghs": [5.70,6.19,5.70,6.22,6.18], "share_bp": 5998, "buyer_gen": 4.8024, "seller_gen": 7.1976, "votes": ["agree","idle","idle","agree","agree"]},
+ "outage": {"minutes": ["09:20","09:21","09:22","09:23","09:24"], "values": [10,10,10,0,0], "incident": "09:23–09:25"},
+ "gappy": {"minutes": ["09:20","09:21","09:22","09:23","09:24"], "values": [10,null,10,null,10], "share_bp": 5992},
+ "shot": "shot_long.jpg", "shot_ratio": 1.2977, "shot_portrait": "shot_short.jpg", "shot_portrait_ratio": 4.1462}

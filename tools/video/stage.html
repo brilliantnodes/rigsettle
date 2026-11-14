@@ -1,0 +1,183 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: InterV; src: url(node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2); font-weight: 400; }
+@font-face { font-family: InterV; src: url(node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2); font-weight: 600; }
+@font-face { font-family: InterV; src: url(node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2); font-weight: 700; }
+@font-face { font-family: InterV; src: url(node_modules/@fontsource/inter/files/inter-latin-800-normal.woff2); font-weight: 800; }
+html, body { margin: 0; background: #14213d; }
+#s { position: relative; overflow: hidden; background: #14213d; color: #fff; font-family: InterV, Inter, sans-serif; }
+.top { position: absolute; left: calc(var(--u) * 28); right: calc(var(--u) * 28); top: calc(var(--u) * 22); display: flex; justify-content: space-between; font-size: calc(var(--u) * 20); color: #c9d1e3; }
+.top b { color: #fff; font-weight: 700; }
+.cap { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--u) * 60); width: max-content; max-width: 84%; background: rgba(5,10,22,.92); color: #fff; font-weight: 600; font-size: calc(var(--u) * var(--capsize)); line-height: 1.25; padding: calc(var(--u) * 14) calc(var(--u) * 26); border-radius: calc(var(--u) * 8); text-align: center; }
+.c { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; }
+.h1 { font-weight: 800; font-size: calc(var(--u) * 84); line-height: 1.12; text-align: center; }
+.or { color: #fca311; }
+.sub { color: #c9d1e3; font-size: calc(var(--u) * 34); margin-top: calc(var(--u) * 20); text-align: center; }
+.bars { display: flex; gap: calc(var(--u) * 14); align-items: flex-end; }
+.bar { position: relative; width: calc(var(--u) * 46); height: calc(var(--u) * 230); border: calc(var(--u) * 3) solid #3b4a6b; border-radius: calc(var(--u) * 6); overflow: hidden; }
+.bar i { position: absolute; left: 0; right: 0; bottom: 0; background: #e8ebf2; }
+.bar.o i { background: #fca311; }
+.bar .base { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--u) * 7); background: #e5484d; }
+.bar.ex i { background: repeating-linear-gradient(45deg, #2fb36b 0 calc(var(--u) * 10), #1f8a51 calc(var(--u) * 10) calc(var(--u) * 20)); }
+.bar.miss { border-style: dashed; border-color: #8da0c4; }
+.lbl { font-size: calc(var(--u) * 22); color: #c9d1e3; text-align: center; margin-top: calc(var(--u) * 10); width: calc(var(--u) * 52); }
+.box { background: #1f2d4f; border: calc(var(--u) * 2) solid #34466f; border-radius: calc(var(--u) * 12); padding: calc(var(--u) * 18) calc(var(--u) * 26); text-align: center; min-width: calc(var(--u) * 240); }
+.box b { display: block; font-size: calc(var(--u) * 34); }
+.box span { display: block; font-size: calc(var(--u) * 20); color: #aeb9d3; margin-top: calc(var(--u) * 4); }
+.box .amt { font-size: calc(var(--u) * 54); font-weight: 800; color: #fca311; margin-top: calc(var(--u) * 14); white-space: nowrap; }
+.box.hl { border-color: #fca311; box-shadow: 0 0 0 calc(var(--u) * 3) rgba(252,163,17,.25); }
+.box .g { color: #4fd18b; }
+.coin { position: absolute; width: calc(var(--u) * 54); height: calc(var(--u) * 54); border-radius: 50%; background: #fca311; color: #14213d; font-weight: 800; font-size: calc(var(--u) * 22); display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); }
+.coin.w { background: #e8ebf2; }
+.coin.gr { background: #4fd18b; }
+.card { background: #fff; color: #14213d; border-radius: calc(var(--u) * 10); overflow: hidden; box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 40) rgba(0,0,0,.35); }
+.card .ch { background: #1f2a37; color: #fff; padding: calc(var(--u) * 14) calc(var(--u) * 20); display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: calc(var(--u) * 26); }
+.tag { background: #ffcc00; color: #000; font-size: calc(var(--u) * 15); font-weight: 800; padding: calc(var(--u) * 3) calc(var(--u) * 9); border-radius: calc(var(--u) * 4); }
+.card .cs { color: #4b5563; font-size: calc(var(--u) * 20); padding: calc(var(--u) * 10) calc(var(--u) * 20) 0; }
+.card table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.card td { padding: calc(var(--u) * 12) calc(var(--u) * 20); border-top: 1px solid #e3e5e8; font-size: calc(var(--u) * 26); }
+.card td:last-child { text-align: right; font-weight: 700; }
+.vals { display: flex; gap: calc(var(--u) * 40); }
+.v { width: calc(var(--u) * 74); height: calc(var(--u) * 74); border-radius: 50%; border: calc(var(--u) * 3) solid #3b4a6b; background: #1f2d4f; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(var(--u) * 24); color: #aeb9d3; }
+.v.ok { background: #2fb36b; border-color: #2fb36b; color: #fff; font-size: calc(var(--u) * 40); }
+.v.idle { opacity: .45; }
+.result { font-weight: 800; color: #fca311; font-size: calc(var(--u) * 44); margin-top: calc(var(--u) * 26); text-align: center; }
+.vnote { color: #aeb9d3; font-size: calc(var(--u) * 24); margin-top: calc(var(--u) * 8); }
+.badge { background: #e5484d; color: #fff; font-weight: 700; font-size: calc(var(--u) * 26); padding: calc(var(--u) * 8) calc(var(--u) * 16); border-radius: calc(var(--u) * 6); margin-bottom: calc(var(--u) * 36); }
+.browser { background: #fff; border-radius: calc(var(--u) * 12); overflow: hidden; box-shadow: 0 calc(var(--u) * 14) calc(var(--u) * 50) rgba(0,0,0,.4); }
+.browser .bb { background: #e9ecf1; height: calc(var(--u) * 40); display: flex; align-items: center; gap: calc(var(--u) * 8); padding: 0 calc(var(--u) * 14); color: #4b5563; font-size: calc(var(--u) * 18); }
+.browser .bb i { width: calc(var(--u) * 13); height: calc(var(--u) * 13); border-radius: 50%; background: #e5484d; display: inline-block; }
+.browser .bb i:nth-child(2) { background: #f5b301; } .browser .bb i:nth-child(3) { background: #2fb36b; }
+.browser .bb span { flex: 1; text-align: center; margin-right: calc(var(--u) * 50); }
+.browser .shot { overflow: hidden; position: relative; }
+.browser img { position: absolute; left: 0; width: 100%; }
+.end b { font-size: calc(var(--u) * 92); font-weight: 800; }
+.end .t { font-size: calc(var(--u) * 34); margin-top: calc(var(--u) * 6); }
+.end .url { color: #fca311; font-size: calc(var(--u) * 34); font-weight: 600; margin-top: calc(var(--u) * 46); }
+.end .f { position: absolute; bottom: calc(var(--u) * 48); font-size: calc(var(--u) * 20); color: #aeb9d3; }
+</style></head>
+<body><div id="s"></div>
+<script>
+const S = document.getElementById("s");
+let D = null, W = 1920, H = 1080, U = 1, PORTRAIT = false;
+function setup(w, h, data) {
+  W = w; H = h; D = data; PORTRAIT = h > w;
+  U = PORTRAIT ? w / 780 : h / 820;
+  S.style.width = w + "px"; S.style.height = h + "px";
+  S.style.setProperty("--u", U + "px");
+  S.style.setProperty("--capsize", PORTRAIT ? 38 : 34);
+}
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const seg = (t, a, b) => ease((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const px = (n) => (n * U) + "px";
+const topbar = () => `<div class="top"><b>RigSettle</b><span>Test GEN on GenLayer Studio · fictional examples</span></div>`;
+const cap = (text, t, dur) => `<div class="cap" style="opacity:${seg(t, .15, .55) * (1 - seg(t, dur - .3, dur))}">${text}</div>`;
+const fmt2 = (x) => x.toFixed(2);
+
+function bars(values, opts) {
+  return `<div class="bars">${values.map((v, i) => {
+    const o = opts(i, v) || {};
+    return `<div><div class="bar ${o.cls || ""}" style="${o.style || ""}"><i style="height:${Math.round(o.h * 100)}%"></i>${o.base ? '<div class="base"></div>' : ""}</div>${o.label ? `<div class="lbl">${o.label}</div>` : ""}</div>`;
+  }).join("")}</div>`;
+}
+
+const SCENES = {
+  hook(t, dur) {
+    const drop = seg(t, 1.4, 2.6);
+    const vals = D.sixty.rows_ghs.concat(D.sixty.rows_ghs);
+    const b = bars(vals, (i, v) => ({ h: lerp(1, v / 10, drop) * seg(t, .1 + i * .06, .6 + i * .06), cls: drop > .5 ? "o" : "" }));
+    return `<div class="c" style="top:${px(PORTRAIT ? 330 : 150)}"><div class="h1" style="${PORTRAIT ? `font-size:${px(66)}` : ""}">You rented 10&nbsp;GH/s.<br><span class="or" style="opacity:${seg(t, 1.6, 2.2)}">You got 6.</span></div><div style="margin-top:${px(70)}">${b}</div></div>`;
+  },
+  question(t, dur) {
+    return `<div class="c" style="top:${px(PORTRAIT ? 760 : 380)}"><div class="h1" style="font-size:${px(PORTRAIT ? 74 : 72)}">Who decides what you owe?</div><div class="sub" style="opacity:${seg(t, .8, 1.4)}">Today: a support ticket,<br>and a judge you never chose.</div></div>`;
+  },
+  lock(t, dur) {
+    const k1 = seg(t, .6, 1.8), k2 = seg(t, 2.2, 3.4);
+    const amt = Math.round(10 * (k1 >= 1 ? 1 : 0) + 2 * (k2 >= 1 ? 1 : 0));
+    let buyerXY, contractXY, sellerXY, html;
+    if (PORTRAIT) {
+      buyerXY = [W * .27, H * .25]; sellerXY = [W * .73, H * .25]; contractXY = [W * .5, H * .47];
+      html = `<div style="position:absolute;left:${buyerXY[0]}px;top:${buyerXY[1]}px;transform:translate(-50%,-50%)"><div class="box"><b>Buyer</b><span>rents 10 GH/s</span></div></div>
+        <div style="position:absolute;left:${sellerXY[0]}px;top:${sellerXY[1]}px;transform:translate(-50%,-50%)"><div class="box"><b>Seller</b><span>owns the rigs</span></div></div>`;
+    } else {
+      buyerXY = [W * .2, H * .36]; contractXY = [W * .5, H * .4]; sellerXY = [W * .8, H * .36];
+      html = `<div style="position:absolute;left:${buyerXY[0]}px;top:${buyerXY[1]}px;transform:translate(-50%,-50%)"><div class="box"><b>Buyer</b><span>rents 10 GH/s</span></div></div>
+        <div style="position:absolute;left:${sellerXY[0]}px;top:${sellerXY[1]}px;transform:translate(-50%,-50%)"><div class="box"><b>Seller</b><span>owns the rigs</span></div></div>`;
+    }
+    html += `<div style="position:absolute;left:${contractXY[0]}px;top:${contractXY[1]}px;transform:translate(-50%,-50%)"><div class="box ${t > .6 && t < 3.6 ? "hl" : ""}" style="min-width:${px(320)}"><b>Intelligent Contract</b><span>escrow on GenLayer</span><div class="amt">${amt} GEN</div></div></div>`;
+    if (t > .5 && k1 < 1) html += `<div class="coin" style="left:${lerp(buyerXY[0], contractXY[0], k1)}px;top:${lerp(buyerXY[1], contractXY[1], k1)}px">10</div>`;
+    if (t > 2.1 && k2 < 1) html += `<div class="coin w" style="left:${lerp(sellerXY[0], contractXY[0], k2)}px;top:${lerp(sellerXY[1], contractXY[1], k2)}px">2</div>`;
+    return html + cap("The buyer locks the price. The seller locks a bond.", t, dur);
+  },
+  meter(t, dur) {
+    const r = D.sixty;
+    const rows = r.minutes.map((m, i) => `<tr style="opacity:${seg(t, .5 + i * .35, .9 + i * .35)}"><td>${r.date} ${m}</td><td>${fmt2(r.rows_ghs[i])} GH/s</td></tr>`).join("");
+    return `<div class="c" style="top:${px(PORTRAIT ? 380 : 170)}"><div class="card" style="width:${px(PORTRAIT ? 820 : 760)}"><div class="ch"><span>Fernhollow Pool</span><span class="tag">FICTIONAL</span></div><div class="cs">Worker rig-sixty · accepted hashrate (UTC)</div><table>${rows}</table></div></div>` +
+      cap("The rigs mine to the buyer's pool. Its page is the meter: neither side can edit it.", t, dur);
+  },
+  validators(t, dur) {
+    const r = D.sixty;
+    const mini = `<div class="card" style="width:${px(400)}"><div class="ch" style="font-size:${px(20)}"><span>Fernhollow Pool · rig-sixty</span></div><table>${r.minutes.map((m, i) => `<tr><td style="font-size:${px(18)};padding:${px(5)} ${px(14)}">${m}</td><td style="font-size:${px(18)};padding:${px(5)} ${px(14)}">${fmt2(r.rows_ghs[i])} GH/s</td></tr>`).join("")}</table></div>`;
+    const v = r.votes.map((vote, i) => {
+      const on = t > 1.0 + i * .55;
+      const cls = on ? (vote === "agree" ? "ok" : "idle") : "";
+      return `<div class="v ${cls}">${on && vote === "agree" ? "✓" : "V" + (i + 1)}</div>`;
+    }).join("");
+    const agreeN = r.votes.filter((x) => x === "agree").length;
+    const votedN = r.votes.filter((x) => x !== "idle").length;
+    const voteText = votedN === agreeN ? `${agreeN} validators voted; all agreed` : `${agreeN} of ${votedN} voting validators agreed`;
+    return `<div class="c" style="top:${px(PORTRAIT ? 250 : 70)}">${mini}<div class="vals" style="margin-top:${px(44)}">${v}</div>
+      <div class="vnote" style="opacity:${seg(t, 3.9, 4.3)}">${voteText}</div>
+      <div class="result" style="opacity:${seg(t, 4.3, 4.8)}">Majority agreed: ${fmt2(r.share_bp / 100)}% delivered</div></div>` +
+      cap("Each validator copies the numbers. Code works out the share. They must agree within 2 points.", t, dur);
+  },
+  payout(t, dur) {
+    const r = D.sixty;
+    const k = seg(t, .8, 2.4);
+    const left = 12 - (r.buyer_gen + r.seller_gen) * k;
+    const cx = W * .5, cy = PORTRAIT ? H * .3 : H * .27, bx = W * (PORTRAIT ? .28 : .33), sx = W * (PORTRAIT ? .72 : .67), by = PORTRAIT ? H * .5 : H * .6;
+    let html = `<div style="position:absolute;left:${cx}px;top:${cy}px;transform:translate(-50%,-50%)"><div class="box" style="min-width:${px(320)}"><b>Intelligent Contract</b><span>escrow on GenLayer</span><div class="amt">${Math.max(0, left).toFixed(left < .005 ? 0 : 2).replace(/\.00$/, "")} GEN</div></div></div>`;
+    html += `<div style="position:absolute;left:${bx}px;top:${by}px;transform:translate(-50%,-50%)"><div class="box"><b>Buyer</b><span>the rest, refunded</span><div class="amt" style="color:#fff">${(r.buyer_gen * k).toFixed(2)} GEN</div></div></div>`;
+    html += `<div style="position:absolute;left:${sx}px;top:${by}px;transform:translate(-50%,-50%)"><div class="box"><b>Seller</b><span>${fmt2(r.share_bp / 100)}% of price and bond</span><div class="amt g">${(r.seller_gen * k).toFixed(2)} GEN</div></div></div>`;
+    if (k > 0 && k < 1) {
+      html += `<div class="coin w" style="left:${lerp(cx, bx, k)}px;top:${lerp(cy, by, k)}px"></div>`;
+      html += `<div class="coin gr" style="left:${lerp(cx, sx, k)}px;top:${lerp(cy, by, k)}px"></div>`;
+    }
+    return html + cap("The seller gets the delivered share. The buyer gets the rest back.", t, dur);
+  },
+  outage(t, dur) {
+    const o = D.outage;
+    const ex = seg(t, 2.3, 2.9);
+    const b = bars(o.values, (i, v) => ({ h: v > 0 ? 1 : ex, cls: v > 0 ? "" : (ex > 0 ? "ex" : ""), base: v === 0, label: o.minutes[i] }));
+    return `<div class="c" style="top:${px(PORTRAIT ? 470 : 190)}"><div class="badge">Status page: stratum restart ${o.incident}</div>${b}
+      <div class="vnote" style="opacity:${ex};font-size:${px(26)};margin-top:${px(24)}">Reported and visible on the meter: excused</div></div>` +
+      cap("An outage counts only if the pool's status page reports it and the meter shows the drop.", t, dur);
+  },
+  missing(t, dur) {
+    const g = D.gappy;
+    const b = bars(g.values, (i, v) => ({ h: v === null ? 0 : 1, cls: v === null ? "miss" : "", label: g.minutes[i] }));
+    return `<div class="c" style="top:${px(PORTRAIT ? 470 : 190)}"><div class="badge" style="background:#3b4a6b">Pool page lists 3 of 5 minutes</div>${b}
+      <div class="vnote" style="opacity:${seg(t, 1.2, 1.7)};font-size:${px(26)};margin-top:${px(24)}">Missing minutes count as zero: ${fmt2(g.share_bp / 100)}% delivered</div></div>` +
+      cap("A minute the pool does not list earns nothing.", t, dur);
+  },
+  site(t, dur) {
+    const bw = PORTRAIT ? W * .86 : W * .62, bh = PORTRAIT ? H * .58 : H * .66;
+    const ratio = PORTRAIT ? D.shot_portrait_ratio : D.shot_ratio;
+    const imgH = bw * ratio, pan = Math.max(0, imgH - (bh - 40 * U)) * seg(t, 1.2, dur - .6);
+    const src = PORTRAIT ? D.shot_portrait : D.shot;
+    return `<div class="c" style="top:${px(PORTRAIT ? 230 : 90)}"><div class="browser" style="width:${bw}px"><div class="bb"><i></i><i></i><i></i><span>rigsettle.brilliantnodes.com</span></div><div class="shot" style="height:${bh - 40 * U}px"><img src="${src}" style="top:${-pan}px"></div></div></div>` +
+      cap(`Live on GenLayer Studio: a real rental, settled at ${fmt2(D.sixty.share_bp / 100)}%.`, t, dur);
+  },
+  end(t, dur) {
+    return `<div class="c end" style="top:${px(PORTRAIT ? 640 : 250)};opacity:${seg(t, 0, .5)}"><img src="logo.svg" style="width:${px(130)};height:${px(130)};margin-bottom:${px(26)}"><b>RigSettle</b><div class="t">Hashrate rentals, settled by validators</div><div class="url">rigsettle.brilliantnodes.com</div></div><div class="c end" style="top:auto;bottom:0;height:${px(120)}"><div class="f" style="position:static">Built on GenLayer · Brilliant Nodes · MIT</div></div>`;
+  },
+};
+
+function draw(name, t, dur, fadeIn, fadeOut) {
+  const o = Math.min(fadeIn ? clamp(t / .3) : 1, fadeOut ? clamp((dur - t) / .3) : 1);
+  S.innerHTML = topbar() + `<div style="position:absolute;inset:0;opacity:${o}">${SCENES[name](t, dur)}</div>`;
+}
+</script></body></html>
