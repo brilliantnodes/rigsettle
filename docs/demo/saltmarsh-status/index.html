@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Saltmarsh Pool status (fictional demo)</title><style>
+body{font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f5f7;color:#16181d}
+header{background:#1f2a37;color:#fff;padding:14px 20px}
+header b{font-size:18px}
+.tag{display:inline-block;background:#ffcc00;color:#000;font-weight:700;font-size:12px;padding:2px 8px;border-radius:4px;margin-left:8px}
+main{max-width:760px;margin:0 auto;padding:16px 20px}
+table{border-collapse:collapse;width:100%;background:#fff}
+th,td{border-bottom:1px solid #e3e5e8;padding:6px 10px;text-align:left;font-variant-numeric:tabular-nums}
+.note{color:#4b5563;font-size:13px}
+.box{background:#fff;padding:14px 16px;border:1px solid #e3e5e8;border-radius:6px;margin:12px 0}
+</style></head>
+<body><header><b>Saltmarsh Pool status</b><span class="tag">FICTIONAL DEMO POOL</span></header><main>
+<h1>Incident history: Saltmarsh Pool</h1>
+<p>Incidents of the last three hours, newest first. All times are UTC.</p>
+<div class="box"><ul id="incidents"></ul></div>
+<p class="note">Page generated at <span id="updated"></span>.</p>
+<p class="note">This is a fictional pool page made for the RigSettle demo. Saltmarsh Pool and Examplecoin do not exist. Nothing here is a real service.</p></main>
+<script>
+function h(seed, m) {
+  var x = (Math.imul(m, 2654435761) ^ Math.imul(seed, 40503)) >>> 0;
+  x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0;
+  return x / 4294967296;
+}
+function pad(n) { return (n < 10 ? "0" : "") + n; }
+function fmt(ms) {
+  var d = new Date(ms);
+  return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()) + " " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
+}
+var NOW = Date.now();
+var CUR = Math.floor(NOW / 60000);
+
+var ul = document.getElementById("incidents");
+var shown = 0;
+for (var m = CUR; m > CUR - 180 && shown < 40; m--) {
+  var k = ((m % 10) + 10) % 10;
+  var j = ((m % 30) + 30) % 30;
+  var li = null;
+  if (k === 3) {
+    li = document.createElement("li");
+    var end = (m + 2) * 60000;
+    var resolved = end <= NOW;
+    li.innerHTML = "<b>Stratum server restart</b> &ndash; mining connections dropped for all workers.<br>Start: " + fmt(m * 60000) + " UTC &middot; End: " + fmt(end) + " UTC &middot; " + (resolved ? "Resolved" : "Ongoing");
+  } else if (j === 17) {
+    li = document.createElement("li");
+    li.innerHTML = "<b>Website dashboard maintenance</b> &ndash; charts may load slowly. Mining and stratum are not affected.<br>Start: " + fmt(m * 60000) + " UTC &middot; End: " + fmt((m + 2) * 60000) + " UTC";
+  }
+  if (li) { ul.appendChild(li); shown++; }
+}
+document.getElementById("updated").textContent = fmt(NOW) + " UTC";
+</script>
+</body></html>

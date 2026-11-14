@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fernhollow Pool - worker rig-ghost (fictional demo)</title><style>
+body{font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f5f7;color:#16181d}
+header{background:#1f2a37;color:#fff;padding:14px 20px}
+header b{font-size:18px}
+.tag{display:inline-block;background:#ffcc00;color:#000;font-weight:700;font-size:12px;padding:2px 8px;border-radius:4px;margin-left:8px}
+main{max-width:760px;margin:0 auto;padding:16px 20px}
+table{border-collapse:collapse;width:100%;background:#fff}
+th,td{border-bottom:1px solid #e3e5e8;padding:6px 10px;text-align:left;font-variant-numeric:tabular-nums}
+.note{color:#4b5563;font-size:13px}
+.box{background:#fff;padding:14px 16px;border:1px solid #e3e5e8;border-radius:6px;margin:12px 0}
+</style></head>
+<body><header><b>Fernhollow Pool</b><span class="tag">FICTIONAL DEMO POOL</span></header><main>
+<h1>Worker statistics: rig-ghost</h1>
+<p>Pool: <b>Fernhollow Pool</b> &middot; Coin: Examplecoin (fictional)</p>
+<div class="box"><p><b>Worker "rig-ghost" was not found on this pool.</b> No accepted shares have been recorded for this worker name.</p></div>
+<p>All times are UTC. Page generated at <span id="updated"></span>.</p>
+<p class="note">This is a fictional pool page made for the RigSettle demo. Fernhollow Pool and Examplecoin do not exist. Nothing here is a real service.</p></main>
+<script>
+function h(seed, m) {
+  var x = (Math.imul(m, 2654435761) ^ Math.imul(seed, 40503)) >>> 0;
+  x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0;
+  return x / 4294967296;
+}
+function pad(n) { return (n < 10 ? "0" : "") + n; }
+function fmt(ms) {
+  var d = new Date(ms);
+  return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()) + " " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
+}
+var NOW = Date.now();
+var CUR = Math.floor(NOW / 60000);
+document.getElementById("updated").textContent = fmt(NOW) + " UTC";</script>
+</body></html>
