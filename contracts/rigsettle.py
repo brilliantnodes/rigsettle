@@ -12,7 +12,9 @@ neither party can write to.
   4. After the window, anyone asks for settlement. Every validator reads the
      pool page and COPIES the per-slot accepted hashrate into a fixed form.
      Plain Python, never the model, turns those numbers into the delivered
-     share, and validators must agree on it within 2 percentage points.
+     share, and validators must agree on it within 2 percentage points
+     (within half a point where the grace rule would decide differently).
+     A slot the page does not list earns nothing.
   5. The seller is paid the delivered share of the price and gets the same
      share of the bond back. The buyer gets the rest. Payouts are messages
      that run when the settlement transaction is finalized.
@@ -35,7 +37,9 @@ from genlayer import *
 
 BP = 10000
 SHARE_TOLERANCE_BP = 200  # validators may differ by 2 points on the raw share
+GRACE_EDGE_TOLERANCE_BP = 50  # ...but only half a point if grace would decide differently
 MIN_COVERAGE_BP = 5000  # at least half the slots must be on the page
+MAX_HISTORY = 100  # history entries kept per agreement (first one always kept)
 PROBE_FRESH_SECS = 60 * 60  # accept needs a passing probe this recent
 SLOT_CHOICES = (1, 5, 10, 15, 30, 60)
 MIN_SLOTS = 3
@@ -78,21 +82,36 @@ def _host_of(url: str) -> str:
     return rest.split(":", 1)[0].lower()
 
 
+PRIVATE_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home", ".arpa", ".corp", ".intranet")
+
+
 def _is_private_host(host: str) -> bool:
-    if host in ("", "localhost", "0.0.0.0", "::1", "::"):
+    """True unless the host is a public-looking DNS name or a public IPv4
+    address written as four plain decimal numbers. IPv6 literals, single
+    labels, numeric tricks (hex, octal, one big number) and private,
+    loopback, link-local (cloud metadata), shared and reserved ranges are
+    all refused. A public name that resolves to a private address cannot be
+    seen from a contract; GenVM's own network sandbox covers that case."""
+    host = host.rstrip(".")
+    if host == "" or ":" in host or "[" in host or "]" in host:
         return True
-    if host.endswith(".localhost") or host.endswith(".local") or host.endswith(".internal"):
+    labels = host.split(".")
+    if len(labels) < 2 or any(lab == "" for lab in labels):
         return True
-    if ":" in host:
-        return host.startswith("fc") or host.startswith("fd") or host.startswith("fe80")
-    parts = host.split(".")
-    if len(parts) == 4 and all(p.isdigit() for p in parts):
-        a, b = int(parts[0]), int(parts[1])
-        if a in (0, 10, 127) or (a == 169 and b == 254) or (a == 172 and 16 <= b <= 31):
+    if host.endswith(PRIVATE_SUFFIXES):
+        return True
+    if labels[-1].isdigit():
+        if len(labels) != 4 or not all(lab.isdigit() and str(int(lab)) == lab and int(lab) <= 255 for lab in labels):
             return True
-        if (a == 192 and b == 168) or (a == 100 and 64 <= b <= 127):
+        a, b = int(labels[0]), int(labels[1])
+        if a in (0, 10, 127) or a >= 224 or (a == 169 and b == 254) or (a == 172 and 16 <= b <= 31):
             return True
-    return False
+        if (a == 192 and b == 168) or (a == 100 and 64 <= b <= 127) or (a == 198 and b in (18, 19)):
+            return True
+        if a == 192 and b == 0 and int(labels[2]) in (0, 2):
+            return True
+        return False
+    return not labels[-1][0].isalpha()
 
 
 def _url_problem(url: str, label: str) -> str:
@@ -103,6 +122,13 @@ def _url_problem(url: str, label: str) -> str:
         return f"{label} must start with http:// or https://"
     if any(c.isspace() or ord(c) < 32 for c in url):
         return f"{label} must not contain spaces"
+    if "\\" in url:
+        return f"{label} must not contain a backslash"
+    authority = url.split("://", 1)[1]
+    for sep in ("/", "?", "#"):
+        authority = authority.split(sep, 1)[0]
+    if "@" in authority:
+        return f"{label} must not contain a user name or password"
     if _is_private_host(_host_of(url)):
         return f"{label} must be a public address"
     return ""
@@ -129,17 +155,46 @@ def _parse_minute(text) -> int | None:
     return int(d.timestamp())
 
 
+def _parse_number(s: str) -> float | None:
+    """'6.28', '1,234.5' or '12,345' to a float. A comma that is not a
+    thousands separator ('6,28') is ambiguous and refused."""
+    s = s.strip()
+    if s == "":
+        return None
+    if "," in s:
+        groups = s.split(".", 1)[0].split(",")
+        if not (groups[0].isdigit() and 1 <= len(groups[0]) <= 3 and all(g.isdigit() and len(g) == 3 for g in groups[1:])):
+            return None
+        s = s.replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def _parse_rate_hs(value, unit) -> int | None:
-    """A copied number and unit to whole hashes per second, or None."""
+    """A copied number and unit to whole hashes per second, or None.
+    Accepts a JSON number, or text such as '6.28' or '6.28 GH/s'."""
     if value is None or isinstance(value, bool):
         return None
-    try:
-        v = float(str(value).replace(",", "").strip())
-    except (TypeError, ValueError):
-        return None
+    if isinstance(value, (int, float)):
+        v = float(value)
+        rest = ""
+    else:
+        s = str(value).strip()
+        j = 0
+        while j < len(s) and (s[j].isdigit() or s[j] in ".,"):
+            j += 1
+        v = _parse_number(s[:j])
+        rest = s[j:].strip()
+        if v is None:
+            return None
     if v != v or v < 0 or v > 1e24:
         return None
-    u = str(unit or "").strip().lower().replace(" ", "")
+    given = str(unit or "").strip()
+    if given and rest and given.lower().replace(" ", "") != rest.lower().replace(" ", ""):
+        return None  # the value and the unit field disagree
+    u = (given or rest).lower().replace(" ", "")
     if u.endswith("/s"):
         u = u[:-2]
     elif u.endswith("ps"):
@@ -191,6 +246,10 @@ def _interpret_meter(t: dict, ans: dict) -> dict:
     Settlement opens one full slot after the window ends, so every slot in
     the window is finished on the pool's page for every validator.
 
+    A row inside the window whose number or unit cannot be read makes the
+    whole reading invalid (N2): guessing would move money. A slot with no
+    row at all is left out here and counts as zero in _share.
+
     Returns {"kind": "READ", "listed": bool, "rows": [[slot_index, rate_hs]]}
     or {"kind": "NO_READING", "reason": <rule id>}.
     """
@@ -218,7 +277,7 @@ def _interpret_meter(t: dict, ans: dict) -> dict:
             return {"kind": "NO_READING", "reason": "N2_FORMAT"}
         rate = _parse_rate_hs(r.get("accepted_rate"), r.get("unit"))
         if rate is None:
-            continue
+            return {"kind": "NO_READING", "reason": "N2_FORMAT"}
         idx = (ts - start) // slot
         if idx in seen and seen[idx] != rate:
             return {"kind": "NO_READING", "reason": "N2_FORMAT"}
@@ -228,7 +287,7 @@ def _interpret_meter(t: dict, ans: dict) -> dict:
     return {"kind": "READ", "listed": True, "rows": [[i, seen[i]] for i in sorted(seen)]}
 
 
-def _check_reading(r) -> dict:
+def _check_reading(r, slots: int) -> dict:
     """Validate a reading that came from another node. Raises if malformed."""
     if not isinstance(r, dict):
         raise ValueError("reading must be an object")
@@ -239,7 +298,7 @@ def _check_reading(r) -> dict:
     if r.get("kind") != "READ" or not isinstance(r.get("listed"), bool):
         raise ValueError("bad kind")
     rows = r.get("rows")
-    if not isinstance(rows, list) or len(rows) > MAX_SLOTS:
+    if not isinstance(rows, list) or len(rows) > slots:
         raise ValueError("bad rows")
     out, last = [], -1
     for row in rows:
@@ -248,7 +307,7 @@ def _check_reading(r) -> dict:
         i, v = row
         if isinstance(i, bool) or isinstance(v, bool) or not isinstance(i, int) or not isinstance(v, int):
             raise ValueError("bad row types")
-        if i <= last or i < 0 or i >= MAX_SLOTS or v < 0 or v > 10**24:
+        if i <= last or i < 0 or i >= slots or v < 0 or v > 10**24:
             raise ValueError("bad row values")
         last = i
         out.append([i, v])
@@ -258,20 +317,25 @@ def _check_reading(r) -> dict:
 
 
 def _share(t: dict, reading: dict, outages: list) -> dict:
-    """The rule table. Pure integer arithmetic.
+    """The rule table. Pure integer arithmetic over EVERY slot of the window.
 
-    S1 caps each slot at the contracted rate; X1 counts an outage slot as
-    delivered when the meter shows the drop; S2 averages over metered slots;
-    G1 forgives a shortfall within the grace band.
+    S1 caps each slot at the contracted rate; M1 counts a slot the page does
+    not list as zero (pools often leave idle intervals out, so an average
+    would pay for slots that were never mined); X1 counts an outage slot as
+    delivered when the meter shows the drop, including a missing slot;
+    S2 divides by all slots; G1 forgives a shortfall within the grace band.
     """
     rate = t["rate_hs"]
+    slots = t["slots"]
     start, _ = _window(t)
     slot = t["slot_minutes"] * 60
     if not reading["listed"]:
-        return {"raw_share_bp": 0, "share_bp": 0, "metered_slots": t["slots"], "excused_slots": 0, "rule": "Z1_WORKER_NOT_LISTED"}
+        return {"raw_share_bp": 0, "share_bp": 0, "metered_slots": 0, "missing_slots": slots, "excused_slots": 0, "rule": "Z1_WORKER_NOT_LISTED"}
+    measured_by_slot = {i: v for i, v in reading["rows"]}
     delivered = 0
     excused = 0
-    for i, measured in reading["rows"]:
+    for i in range(slots):
+        measured = measured_by_slot.get(i, 0)
         s0 = start + i * slot
         down = any(a < s0 + slot and b > s0 for a, b in outages)
         if down and measured < rate:
@@ -279,12 +343,12 @@ def _share(t: dict, reading: dict, outages: list) -> dict:
             excused += 1
         else:
             delivered += min(measured, rate)
-    metered = len(reading["rows"])
-    raw = (BP * delivered) // (rate * metered)
-    grace = t["grace_bp"]
-    if raw >= BP - grace:
-        return {"raw_share_bp": raw, "share_bp": BP, "metered_slots": metered, "excused_slots": excused, "rule": "G1_WITHIN_GRACE"}
-    return {"raw_share_bp": raw, "share_bp": raw, "metered_slots": metered, "excused_slots": excused, "rule": "S2_PRO_RATA"}
+    metered = len(measured_by_slot)
+    raw = (BP * delivered) // (rate * slots)
+    base = {"raw_share_bp": raw, "metered_slots": metered, "missing_slots": slots - metered, "excused_slots": excused}
+    if raw >= BP - t["grace_bp"]:
+        return {**base, "share_bp": BP, "rule": "G1_WITHIN_GRACE"}
+    return {**base, "share_bp": raw, "rule": "S2_PRO_RATA"}
 
 
 def _payout(price: int, bond: int, share_bp: int) -> dict:
@@ -376,7 +440,7 @@ Fill in:
 - "page_kind": "worker_stats" if the page shows hashrate statistics for the worker named above; "worker_not_found" if the page clearly says this worker is not found or has no shares on this pool; "unavailable" if the page says the statistics are down, unavailable or under maintenance; "other" for anything else (error page, login wall, another worker, another pool).
 - "pool_name_on_page": the pool's name exactly as the page writes it, or "".
 - "times_utc": "yes" if the page says its times are UTC, otherwise "no".
-- "rows": for each row of the worker's table whose slot start time lies in the WINDOW, one object {{"slot_start_utc": "YYYY-MM-DD HH:MM", "accepted_rate": number, "unit": "GH/s"}}. Use the pool-side accepted hashrate, copy the number and unit exactly as shown, and skip any row marked as in progress. Use [] if there are none.
+- "rows": for each row of the worker's table whose slot start time lies in the WINDOW, one object {{"slot_start_utc": "YYYY-MM-DD HH:MM", "accepted_rate": number, "unit": "GH/s"}}. Use the pool-side accepted hashrate. Write "accepted_rate" as a JSON number with a dot as the decimal separator and copy its digits exactly as shown; write the unit exactly as shown. If a row shows no hashrate (for example "-" or "offline"), use 0. Skip any row marked as in progress. Never add a row the page does not show. Use [] if there are none.
 
 Respond with JSON only:
 {{"page_kind": "...", "pool_name_on_page": "...", "times_utc": "yes" | "no", "rows": [...]}}"""
@@ -442,7 +506,15 @@ def _same_reading(t: dict, outages: list, a: dict, b: dict) -> bool:
     if a["listed"] != b["listed"]:
         return False
     sa, sb = _share(t, a, outages), _share(t, b, outages)
-    return abs(sa["raw_share_bp"] - sb["raw_share_bp"]) <= SHARE_TOLERANCE_BP
+    gap = abs(sa["raw_share_bp"] - sb["raw_share_bp"])
+    if gap > SHARE_TOLERANCE_BP:
+        return False
+    # The grace rule is a step. Where the two readings fall on different
+    # sides of it, a 2-point gap would let a leader lift a 95% reading to
+    # full pay, so the readings must then be within half a point.
+    if sa["rule"] != sb["rule"] and gap > GRACE_EDGE_TOLERANCE_BP:
+        return False
+    return True
 
 
 # ------------------------------------------------------------- storage
@@ -515,6 +587,11 @@ class RigSettle(gl.Contract):
     def _log(self, a: Agreement, action: str, note: str = "") -> None:
         h = json.loads(a.history_json)
         h.append({"at": self._now(), "by": gl.message.sender_address.as_hex, "action": action, "note": note})
+        if len(h) > MAX_HISTORY:
+            # Repeated probes or no-reading attempts must not grow the record
+            # without limit: keep the creation entry and the latest steps.
+            marker = {"at": self._now(), "by": "", "action": "trimmed", "note": "older steps dropped"}
+            h = h[:1] + [marker] + h[-(MAX_HISTORY - 2):]
         a.history_json = json.dumps(h)
 
     def _index(self, addr: str, agreement_id: str) -> None:
@@ -871,12 +948,12 @@ class RigSettle(gl.Contract):
             if not isinstance(leader_result, gl.vm.Return):
                 return False
             try:
-                lr = _check_reading(leader_result.calldata)
+                lr = _check_reading(leader_result.calldata, t["slots"])
             except Exception:
                 return False
             return _same_reading(t, outages, lr, _read_meter(t))
 
-        reading = _check_reading(gl.vm.run_nondet_unsafe(leader_fn, validator_fn))
+        reading = _check_reading(gl.vm.run_nondet_unsafe(leader_fn, validator_fn), t["slots"])
         if reading["kind"] == "NO_READING":
             att = json.loads(a.attempts_json)
             att.append({"at": now, "reason": reading["reason"]})
@@ -943,6 +1020,8 @@ class RigSettle(gl.Contract):
     def get_rules(self) -> dict:
         return {
             "share_tolerance_bp": SHARE_TOLERANCE_BP,
+            "grace_edge_tolerance_bp": GRACE_EDGE_TOLERANCE_BP,
+            "missing_slot_counts_as": 0,
             "min_coverage_bp": MIN_COVERAGE_BP,
             "probe_fresh_minutes": PROBE_FRESH_SECS // 60,
             "slot_choices": list(SLOT_CHOICES),
@@ -952,4 +1031,5 @@ class RigSettle(gl.Contract):
             "max_grace_bp": MAX_GRACE_BP,
             "max_price_wei": str(MAX_PRICE),
             "page_chars": PAGE_CHARS,
+            "max_history": MAX_HISTORY,
         }

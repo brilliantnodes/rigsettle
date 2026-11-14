@@ -1,0 +1,28 @@
+name: Ready rental
+
+# Every hour: settle or expire anything left idle, then create one fictional
+# "rig delivering about 60%" rental that is ready to settle about 10 minutes
+# later, so visitors can watch a settlement without waiting for a new window.
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ready
+  cancel-in-progress: false
+
+jobs:
+  ready:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install genlayer-py==0.18.0
+      - run: python tools/ready.py

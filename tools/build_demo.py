@@ -45,7 +45,8 @@ function rate(m) {
   if (MODE === "steady") return 10 * (0.985 + 0.035 * h(SEED, m));
   if (MODE === "sixty") return 10 * (0.57 + 0.06 * h(SEED, m));
   if (MODE === "dark") return 10 * (0.99 + 0.02 * h(SEED, m));
-  if (MODE === "outage") { var k = ((m % 10) + 10) % 10; return (k === 3 || k === 4) ? 0 : 10 * (0.995 + 0.015 * h(SEED, m)); }
+  if (MODE === "outage") { var k = ((m % 5) + 5) % 5; return (k === 3 || k === 4) ? 0 : 10 * (0.995 + 0.015 * h(SEED, m)); }
+  if (MODE === "gappy") return (((m % 5) + 5) % 5) % 2 === 1 ? null : 10 * (0.99 + 0.02 * h(SEED, m));
   return 0;
 }
 var tb = document.getElementById("rows");
@@ -54,6 +55,7 @@ cur.innerHTML = "<td>" + fmt(CUR * 60000) + "</td><td>in progress</td>";
 tb.appendChild(cur);
 for (var i = 1; i <= ROWS; i++) {
   var m = CUR - i;
+  if (rate(m) === null) continue; // this pool leaves minutes without accepted shares out
   var tr = document.createElement("tr");
   tr.innerHTML = "<td>" + fmt(m * 60000) + "</td><td>" + rate(m).toFixed(2) + " GH/s</td>";
   tb.appendChild(tr);
@@ -64,8 +66,8 @@ document.getElementById("updated").textContent = fmt(NOW) + " UTC";
 STATUS_JS = r"""
 var ul = document.getElementById("incidents");
 var shown = 0;
-for (var m = CUR; m > CUR - 180 && shown < 40; m--) {
-  var k = ((m % 10) + 10) % 10;
+for (var m = CUR; m > CUR - 90 && shown < 40; m--) {
+  var k = ((m % 5) + 5) % 5;
   var j = ((m % 30) + 30) % 30;
   var li = null;
   if (k === 3) {
@@ -98,11 +100,11 @@ def header(pool):
 FICTION = ('<p class="note">This is a fictional pool page made for the RigSettle demo. '
            '{pool} and Examplecoin do not exist. Nothing here is a real service.</p>')
 
-def worker_page(pool, worker, mode, seed, rows=40):
+def worker_page(pool, worker, mode, seed, rows=40, extra_note=""):
     body = f"""{header(pool)}<main>
 <h1>Worker statistics: {worker}</h1>
 <p>Pool: <b>{pool}</b> &middot; Coin: Examplecoin (fictional) &middot; Worker: <b>{worker}</b></p>
-<p>All times are UTC. Each row is one 1-minute slot. <b>Accepted hashrate</b> is measured by the pool from the shares it accepted (pool-side, not reported by the rig).</p>
+<p>All times are UTC. Each row is one 1-minute slot. <b>Accepted hashrate</b> is measured by the pool from the shares it accepted (pool-side, not reported by the rig).{extra_note}</p>
 <div class="box"><table><thead><tr><th>Slot start (UTC)</th><th>Accepted hashrate</th></tr></thead><tbody id="rows"></tbody></table></div>
 <p class="note">Page generated at <span id="updated"></span>.</p>
 {FICTION.format(pool=pool)}</main>"""
@@ -155,7 +157,7 @@ def dark_page(pool, worker, seed):
 def status_page(pool):
     body = f"""<header><b>{pool} status</b><span class="tag">FICTIONAL DEMO POOL</span></header><main>
 <h1>Incident history: {pool}</h1>
-<p>Incidents of the last three hours, newest first. All times are UTC.</p>
+<p>Incidents of the last 90 minutes, newest first. All times are UTC.</p>
 <div class="box"><ul id="incidents"></ul></div>
 <p class="note">Page generated at <span id="updated"></span>.</p>
 {FICTION.format(pool=pool)}</main>"""
@@ -172,5 +174,7 @@ if __name__ == "__main__":
     write("fernhollow/rig-sixty", worker_page("Fernhollow Pool", "rig-sixty", "sixty", 23))
     write("fernhollow/rig-ghost", ghost_page("Fernhollow Pool", "rig-ghost"))
     write("saltmarsh/rig-outage", worker_page("Saltmarsh Pool", "rig-outage", "outage", 37))
+    write("fernhollow/rig-gappy", worker_page("Fernhollow Pool", "rig-gappy", "gappy", 61,
+          extra_note=" Minutes in which the pool accepted no shares from this worker are not listed."))
     write("saltmarsh-status", status_page("Saltmarsh Pool"))
     write("quillmoor/rig-dark", dark_page("Quillmoor Pool", "rig-dark", 53))

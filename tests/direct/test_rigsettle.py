@@ -5,6 +5,7 @@ the fictional coin Examplecoin.
 """
 
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ import pytest
 
 from tests.direct.conftest import to_hex
 
-CONTRACT = "contracts/rigsettle.py"
+CONTRACT = os.environ.get("RS_CONTRACT", "contracts/rigsettle.py")  # mutation runs point elsewhere
 G = 10**18
 GH = 10**9
 T0 = int(datetime(2026, 11, 14, 6, 0, tzinfo=timezone.utc).timestamp())
@@ -200,6 +201,19 @@ def test_create_locks_price_and_records_terms(env):
         (dict(meter_url="ftp://x.example/a"), "meter_url must start"),
         (dict(meter_url="http://127.0.0.1/a"), "public address"),
         (dict(meter_url="http://169.254.169.254/latest"), "public address"),
+        (dict(meter_url="http://[::ffff:169.254.169.254]/latest"), "public address"),
+        (dict(meter_url="http://[::1]/a"), "public address"),
+        (dict(meter_url="http://2130706433/a"), "public address"),
+        (dict(meter_url="http://0x7f.0.0.1/a"), "public address"),
+        (dict(meter_url="http://0177.0.0.1/a"), "public address"),
+        (dict(meter_url="http://224.0.0.1/a"), "public address"),
+        (dict(meter_url="http://metadata/computeMetadata"), "public address"),
+        (dict(meter_url="http://metadata.google.internal/x"), "public address"),
+        (dict(meter_url="http://router.lan/x"), "public address"),
+        (dict(meter_url="http://localhost./a"), "public address"),
+        (dict(meter_url="http://127.0.0.1\\@pool.example/a"), "backslash"),
+        (dict(meter_url="https://pool.example@127.0.0.1/a"), "user name"),
+        (dict(meter_url="https://user:pw@pool.example/a"), "user name"),
         (dict(status_prefix="http://status.example/"), "https:// address ending"),
         (dict(status_prefix="https://status.example/x"), "https:// address ending"),
         (dict(slot_minutes=7), "slot_minutes"),
@@ -423,11 +437,38 @@ def test_grace_edge(env, mod):
     assert at(9999)["share_bp"] == 9999
 
 
-def test_missing_slots_are_averaged_over_metered_ones(env):
+def test_missing_slots_count_as_zero(env):
     active(env)
     out = settle(env, meter_answer([6.0, None, 6.0, None, 6.0]))
-    assert out["share_bp"] == 6000
-    assert env.c.get_agreement("1")["result"]["metered_slots"] == 3
+    assert out["share_bp"] == 3600  # 18 of 50 GH/s-minutes
+    r = env.c.get_agreement("1")["result"]
+    assert r["metered_slots"] == 3 and r["missing_slots"] == 2
+
+
+def test_idling_every_other_slot_is_not_paid_in_full(env):
+    """Pools often leave idle intervals out of a worker's history. A seller
+    who idles every other slot must not be paid as if every slot was mined."""
+    active(env)
+    out = settle(env, meter_answer([10.0, None, 10.0, None, 10.0]))
+    assert out == {"settled": True, "share_bp": 6000, "rule": "S2_PRO_RATA"}
+    assert_paid(env, 4 * G + 8 * G // 10, 6 * G + 12 * G // 10)
+
+
+def test_missing_slots_under_a_reported_outage_are_excused(env):
+    active(env)
+    evidence(env, [INCIDENT])
+    out = settle(env, meter_answer([10.0, 10.0, 10.0, None, None]))
+    assert out["share_bp"] == 10000
+    assert env.c.get_agreement("1")["result"]["excused_slots"] == 2
+
+
+@pytest.mark.parametrize("value,unit", [("n/a", "GH/s"), (6.0, "furlongs"), (None, "GH/s"), ("6,28", "GH/s")])
+def test_an_unreadable_row_in_the_window_moves_nothing(env, value, unit):
+    active(env)
+    extra = [{"slot_start_utc": hm(START + 60), "accepted_rate": value, "unit": unit}]
+    out = settle(env, meter_answer([6.0, None, 6.0, 6.0, 6.0], extra=extra))
+    assert out == {"settled": False, "reason": "N2_FORMAT"}
+    assert env.sent.total() == 0
 
 
 def test_units_are_converted(env):
@@ -806,7 +847,9 @@ def test_parse_minute(mod, text, ok):
 @pytest.mark.parametrize(
     "value,unit,want",
     [(10.03, "GH/s", 10030000000), ("6,000", "MH/s", 6000000000), (1.5, "TH/s", 1500000000000), (120, "kH/s", 120000),
-     (7, "Sol/s", 7), (5, "H/s", 5), (5, "furlongs", None), (-1, "GH/s", None), (True, "GH/s", None), ("abc", "GH/s", None), (3, "ghs", 3 * GH)],
+     (7, "Sol/s", 7), (5, "H/s", 5), (5, "furlongs", None), (-1, "GH/s", None), (True, "GH/s", None), ("abc", "GH/s", None), (3, "ghs", 3 * GH),
+     ("6.28 GH/s", "", 6280000000), ("6.28 GH/s", "GH/s", 6280000000), ("6.28 GH/s", "MH/s", None), ("6,28", "GH/s", None),
+     ("1,234.5", "kH/s", 1234500), ("12,345", "H/s", 12345), ("1,23,456", "H/s", None), ("", "GH/s", None), (float("nan"), "GH/s", None)],
 )
 def test_parse_rate(mod, value, unit, want):
     assert mod._parse_rate_hs(value, unit) == want
@@ -828,3 +871,93 @@ def test_nondet_closures_are_picklable(env, recwarn):
     evidence(env, [INCIDENT])
     settle(env, meter_answer([6.0] * 5))
     assert not [w for w in recwarn.list if "not picklable" in str(w.message)]
+
+
+# ------------------------------------------------------ added in v2
+
+
+def _validator_copies(env, rates):
+    env.vm.clear_mocks()
+    env.vm.mock_web(METER_RE, {"status": 200, "body": "x"})
+    env.vm.mock_llm(METER_PROMPT, meter_answer(rates))
+    return env.vm.run_validator()
+
+
+def test_grace_edge_needs_readings_within_half_a_point(env):
+    """A leader reading 97.00% (full pay with 3% grace) is accepted by a
+    validator reading 96.80%, but not by one reading 95.50%: on different
+    sides of the grace step, readings must be within half a point."""
+    active(env)
+    settle(env, meter_answer([9.7] * 5))
+    assert env.c.get_agreement("1")["result"]["rule"] == "G1_WITHIN_GRACE"
+    assert _validator_copies(env, [9.68] * 5) is True
+    assert _validator_copies(env, [9.55] * 5) is False
+    assert _validator_copies(env, [9.5] * 5) is False
+
+
+def test_two_point_tolerance_still_applies_on_the_same_side(env):
+    active(env)
+    settle(env, meter_answer([6.0] * 5))
+    assert _validator_copies(env, [5.85] * 5) is True  # 1.5 points apart, both pro rata
+    assert _validator_copies(env, [5.75] * 5) is False  # 2.5 points apart
+
+
+def test_validator_rejects_rows_outside_the_window(env):
+    active(env)
+    settle(env, meter_answer([6.0] * 5))
+    bad = {"kind": "READ", "listed": True, "rows": [[0, 6 * GH], [5, 6 * GH]]}
+    assert env.vm.run_validator(leader_result=bad) is False
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://pool.example/workers/addr@rig-1/", "https://pool.example./w/rig", "http://8.8.8.8/w", "https://xn--80ak6aa92e.example/w"],
+)
+def test_public_urls_are_accepted(env, url):
+    assert create(env, meter_url=url)["ok"] is True
+
+
+def test_history_is_capped(env):
+    create(env)
+    for i in range(105):
+        probe(env, at=T0 + 60 + i)
+    h = env.c.get_agreement("1")["history"]
+    assert len(h) == 100 and h[0]["action"] == "create" and h[1]["action"] == "trimmed" and h[-1]["action"] == "probe"
+
+
+def test_rules_view_v2(env):
+    r = env.c.get_rules()
+    assert r["grace_edge_tolerance_bp"] == 50 and r["missing_slot_counts_as"] == 0 and r["max_history"] == 100
+
+
+def test_one_waiver_does_not_open_settlement_early(env):
+    active(env)
+    env.vm.warp(iso(END + 30))
+    env.vm.sender = env.alice
+    env.c.waive_evidence("1")
+    with env.vm.expect_revert("settlement opens"):
+        settle(env, meter_answer([10.0] * 5), at=END + 61)
+
+
+def test_evidence_validator_rejects_times_two_slots_apart(env):
+    active(env)
+    evidence(env, [INCIDENT])
+    env.vm.clear_mocks()
+    env.vm.mock_web(re.escape(STATUS), {"status": 200, "body": "x"})
+    env.vm.mock_llm(STATUS_PROMPT, status_answer([{"service": "stratum", "start_utc": hm(START + 60), "end_utc": hm(START + 300)}]))
+    assert env.vm.run_validator() is False
+
+
+def test_validator_rejects_a_slot_index_beyond_the_window_even_if_the_share_matches(env):
+    active(env)
+    settle(env, meter_answer([6.0, 6.0, 6.0, 6.0, None]))
+    sneaky = {"kind": "READ", "listed": True, "rows": [[0, 6 * GH], [1, 6 * GH], [2, 6 * GH], [3, 6 * GH], [7, 6 * GH]]}
+    assert env.vm.run_validator(leader_result=sneaky) is False
+
+
+def test_validator_rejects_listed_flag_mismatch_on_a_no_show(env):
+    active(env)
+    settle(env, meter_answer([], kind="worker_not_found"))
+    assert env.vm.run_validator() is True
+    assert env.vm.run_validator(leader_result={"kind": "READ", "listed": True, "rows": []}) is False
+    assert env.vm.run_validator(leader_result={"kind": "READ", "listed": False, "rows": [[0, 6 * GH]]}) is False

@@ -50,7 +50,8 @@ function rate(m) {
   if (MODE === "steady") return 10 * (0.985 + 0.035 * h(SEED, m));
   if (MODE === "sixty") return 10 * (0.57 + 0.06 * h(SEED, m));
   if (MODE === "dark") return 10 * (0.99 + 0.02 * h(SEED, m));
-  if (MODE === "outage") { var k = ((m % 10) + 10) % 10; return (k === 3 || k === 4) ? 0 : 10 * (0.995 + 0.015 * h(SEED, m)); }
+  if (MODE === "outage") { var k = ((m % 5) + 5) % 5; return (k === 3 || k === 4) ? 0 : 10 * (0.995 + 0.015 * h(SEED, m)); }
+  if (MODE === "gappy") return (((m % 5) + 5) % 5) % 2 === 1 ? null : 10 * (0.99 + 0.02 * h(SEED, m));
   return 0;
 }
 var tb = document.getElementById("rows");
@@ -59,6 +60,7 @@ cur.innerHTML = "<td>" + fmt(CUR * 60000) + "</td><td>in progress</td>";
 tb.appendChild(cur);
 for (var i = 1; i <= ROWS; i++) {
   var m = CUR - i;
+  if (rate(m) === null) continue; // this pool leaves minutes without accepted shares out
   var tr = document.createElement("tr");
   tr.innerHTML = "<td>" + fmt(m * 60000) + "</td><td>" + rate(m).toFixed(2) + " GH/s</td>";
   tb.appendChild(tr);

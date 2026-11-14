@@ -11,7 +11,10 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ADDRESS = os.environ.get("RS_ADDRESS", "0xE74E206a60DD7e284FF3e0452DB8078a464daa11")
+sys.path.insert(0, str(HERE))
+from rs import DEFAULT_ADDRESS  # noqa: E402
+
+ADDRESS = DEFAULT_ADDRESS  # web/src/config.js, or RS_ADDRESS
 OUT = Path(os.environ.get("RS_OUT", "canary_results.json"))
 
 

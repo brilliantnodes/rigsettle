@@ -19,7 +19,16 @@ from genlayer_py.chains import studionet
 from genlayer_py.types import TransactionStatus
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ADDRESS = os.environ.get("RS_ADDRESS", "")
+def _site_address() -> str:
+    """The deployed address the site uses (web/src/config.js)."""
+    try:
+        text = (ROOT / "web" / "src" / "config.js").read_text()
+        return text.split('CONTRACT_ADDRESS = "', 1)[1].split('"', 1)[0]
+    except Exception:
+        return ""
+
+
+DEFAULT_ADDRESS = os.environ.get("RS_ADDRESS") or _site_address()
 G = 10**18
 GH = 10**9
 SITE = "https://rigsettle.brilliantnodes.com/demo"
