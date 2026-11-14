@@ -14,7 +14,7 @@ th,td{border-bottom:1px solid #e3e5e8;padding:6px 10px;text-align:left;font-vari
 </style></head>
 <body><header><b>Saltmarsh Pool status</b><span class="tag">FICTIONAL DEMO POOL</span></header><main>
 <h1>Incident history: Saltmarsh Pool</h1>
-<p>Incidents of the last three hours, newest first. All times are UTC.</p>
+<p>Incidents of the last 90 minutes, newest first. All times are UTC.</p>
 <div class="box"><ul id="incidents"></ul></div>
 <p class="note">Page generated at <span id="updated"></span>.</p>
 <p class="note">This is a fictional pool page made for the RigSettle demo. Saltmarsh Pool and Examplecoin do not exist. Nothing here is a real service.</p></main>
@@ -34,8 +34,8 @@ var CUR = Math.floor(NOW / 60000);
 
 var ul = document.getElementById("incidents");
 var shown = 0;
-for (var m = CUR; m > CUR - 180 && shown < 40; m--) {
-  var k = ((m % 10) + 10) % 10;
+for (var m = CUR; m > CUR - 90 && shown < 40; m--) {
+  var k = ((m % 5) + 5) % 5;
   var j = ((m % 30) + 30) % 30;
   var li = null;
   if (k === 3) {
