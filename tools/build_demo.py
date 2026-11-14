@@ -44,6 +44,7 @@ WORKER_JS = r"""
 function rate(m) {
   if (MODE === "steady") return 10 * (0.985 + 0.035 * h(SEED, m));
   if (MODE === "sixty") return 10 * (0.57 + 0.06 * h(SEED, m));
+  if (MODE === "dark") return 10 * (0.99 + 0.02 * h(SEED, m));
   if (MODE === "outage") { var k = ((m % 10) + 10) % 10; return (k === 3 || k === 4) ? 0 : 10 * (0.995 + 0.015 * h(SEED, m)); }
   return 0;
 }
@@ -117,13 +118,39 @@ def ghost_page(pool, worker):
 {FICTION.format(pool=pool)}</main>"""
     return page(f"{pool} - worker {worker} (fictional demo)", body, 'document.getElementById("updated").textContent = fmt(NOW) + " UTC";', "")
 
-def dark_page(pool, worker):
+DARK_JS = r"""
+var k = ((CUR % 10) + 10) % 10;
+if (k >= 6) {
+  document.getElementById("live").hidden = true;
+  document.getElementById("down").hidden = false;
+} else {
+""" + WORKER_JS + r"""
+}
+document.getElementById("updated2").textContent = fmt(NOW) + " UTC";
+"""
+
+
+def dark_page(pool, worker, seed):
+    """Readable most of the time, but the statistics service is down from
+    6 to 9 minutes past every ten. A window starting on the hour is readable
+    when the seller accepts and dark when settlement opens."""
     body = f"""{header(pool)}<main>
+<div id="live">
+<h1>Worker statistics: {worker}</h1>
+<p>Pool: <b>{pool}</b> &middot; Coin: Examplecoin (fictional) &middot; Worker: <b>{worker}</b></p>
+<p>All times are UTC. Each row is one 1-minute slot. <b>Accepted hashrate</b> is measured by the pool from the shares it accepted (pool-side, not reported by the rig).</p>
+<div class="box"><table><thead><tr><th>Slot start (UTC)</th><th>Accepted hashrate</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p class="note">Page generated at <span id="updated"></span>.</p>
+</div>
+<div id="down" hidden>
 <h1>Dashboard temporarily unavailable</h1>
 <div class="box"><p>The {pool} statistics service is down for unplanned maintenance. Worker statistics cannot be shown right now. Please try again later.</p></div>
-<p>All times are UTC. Page generated at <span id="updated"></span>.</p>
+</div>
+<p class="note">Demo schedule: this fictional statistics service is down from 6 to 9 minutes past every ten. Checked at <span id="updated2"></span>.</p>
 {FICTION.format(pool=pool)}</main>"""
-    return page(f"{pool} (fictional demo)", body, 'document.getElementById("updated").textContent = fmt(NOW) + " UTC";', "")
+    cfg = f"var MODE=\"dark\";var SEED={seed};var ROWS=40;"
+    return page(f"{pool} - worker {worker} (fictional demo)", body, DARK_JS, cfg)
+
 
 def status_page(pool):
     body = f"""<header><b>{pool} status</b><span class="tag">FICTIONAL DEMO POOL</span></header><main>
@@ -146,4 +173,4 @@ if __name__ == "__main__":
     write("fernhollow/rig-ghost", ghost_page("Fernhollow Pool", "rig-ghost"))
     write("saltmarsh/rig-outage", worker_page("Saltmarsh Pool", "rig-outage", "outage", 37))
     write("saltmarsh-status", status_page("Saltmarsh Pool"))
-    write("quillmoor/rig-dark", dark_page("Quillmoor Pool", "rig-dark"))
+    write("quillmoor/rig-dark", dark_page("Quillmoor Pool", "rig-dark", 53))

@@ -36,6 +36,7 @@ var CUR = Math.floor(NOW / 60000);
 function rate(m) {
   if (MODE === "steady") return 10 * (0.985 + 0.035 * h(SEED, m));
   if (MODE === "sixty") return 10 * (0.57 + 0.06 * h(SEED, m));
+  if (MODE === "dark") return 10 * (0.99 + 0.02 * h(SEED, m));
   if (MODE === "outage") { var k = ((m % 10) + 10) % 10; return (k === 3 || k === 4) ? 0 : 10 * (0.995 + 0.015 * h(SEED, m)); }
   return 0;
 }
