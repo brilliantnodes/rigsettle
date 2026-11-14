@@ -38,15 +38,27 @@ def case(a) -> str:
             "rig-ghost": "Seller never shows", "rig-dark": "Pool page goes dark"}.get(w, w)
 
 
+def read_retry(c, fn, args=None, tries=6):
+    """Studio's gateway sometimes answers with an HTML error page for a few seconds."""
+    import time
+    for k in range(tries):
+        try:
+            return read(c, DEFAULT_ADDRESS, fn, args or [])
+        except Exception:
+            if k == tries - 1:
+                raise
+            time.sleep(5)
+
+
 def main():
     runs = json.loads(open(sys.argv[1]).read()) if len(sys.argv) > 1 else {}
     c, _ = client()
-    n = read(c, DEFAULT_ADDRESS, "get_count")
+    n = read_retry(c, "get_count")
     print("| # | Case | Run through | Measured | Paid share | Rule | Buyer / seller GEN |")
     print("|---|---|---|---|---|---|---|")
     open_ids = []
     for i in range(1, n + 1):
-        a = read(c, DEFAULT_ADDRESS, "get_agreement", [str(i)])
+        a = read_retry(c, "get_agreement", [str(i)])
         if a["state"] in ("OPEN", "ACTIVE"):
             open_ids.append(i)
             continue
@@ -55,7 +67,7 @@ def main():
         measured = f"{raw / 100:.2f}%" if raw is not None else "–"
         paid = f"{r['share_bp'] / 100:.2f}%" if r.get("share_bp") is not None else "–"
         print(f"| #{i} | {case(a)} | {runs.get(str(i), '')} | {measured} | {paid} | `{r.get('rule')}` | {gen(r.get('paid_buyer', 0))} / {gen(r.get('paid_seller', 0))} |")
-    print(f"\nagreements: {n}; still open: {open_ids}; locked: {read(c, DEFAULT_ADDRESS, 'get_locked')} wei")
+    print(f"\nagreements: {n}; still open: {open_ids}; locked: {read_retry(c, 'get_locked')} wei")
 
 
 if __name__ == "__main__":

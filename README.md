@@ -85,7 +85,66 @@ Hosted with the site under [`/demo/`](https://rigsettle.brilliantnodes.com/demo/
 
 Demo rentals use five 1-minute slots so a full lifecycle takes about 15 minutes; **Ready to settle now** skips the wait. Real rentals use hourly slots (see `examples/terms-hourly.example.json`).
 
-LIVE_RESULTS_PLACEHOLDER
+## Live results on Studio (v2)
+
+Contract `0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f`, 14 November 2026. Every rental used the fictional demo pools, five 1-minute slots, a 10 GEN price and a 2 GEN bond. The table is printed from the chain by `tools/results_table.py`; only the "Run through" column is written by hand.
+
+| # | Case | Run through | Measured | Paid share | Rule | Buyer / seller GEN |
+|---|---|---|---|---|---|---|
+| #1 | Steady rig | command line | 99.50% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #2 | Rig delivering about 60% | command line | 59.98% | 59.98% | `S2_PRO_RATA` | 4.8024 / 7.1976 |
+| #3 | Pool outage, with outage report | command line | 100.00% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #4 | Pool outage, no report | command line | 60.00% | 60.00% | `S2_PRO_RATA` | 4.8 / 7.2 |
+| #5 | Seller never shows | command line | 0.00% | 0.00% | `Z1_WORKER_NOT_LISTED` | 12 / 0 |
+| #6 | Never accepted: expired | command line (probe fell in the page's dark minutes or behind a busy queue, so acceptance was refused and the bond sent back) | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #7 | Both parties agree a split | command line | – | 75.00% | `R1_AGREED_SPLIT` | 3 / 9 |
+| #8 | Rig idles 2 of 5 minutes, pool hides them | command line | 59.92% | 59.92% | `S2_PRO_RATA` | 4.8096 / 7.1904 |
+| #9 | Buyer cancels before acceptance | command line | – | – | `CANCELLED_BY_BUYER` | 10 / 0 |
+| #10 | Never accepted: expired | command line | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #11 | Buyer cancels before acceptance | command line (a create with a metadata URL and an accept with the wrong bond were both refused and refunded first) | – | – | `CANCELLED_BY_BUYER` | 10 / 0 |
+| #12 | Rig delivering about 60% | hourly ready rental; settled from "Ready to settle now" by a first-time visitor (site, iPhone 15 profile, no accounts) | 60.22% | 60.22% | `S2_PRO_RATA` | 4.7736 / 7.2264 |
+| #13 | Rig delivering about 60% | site, Chrome | 60.22% | 60.22% | `S2_PRO_RATA` | 4.7736 / 7.2264 |
+| #14 | Rig idles 2 of 5 minutes, pool hides them | site, Firefox | 59.96% | 59.96% | `S2_PRO_RATA` | 4.8048 / 7.1952 |
+| #15 | Pool outage, no report | site, WebKit (test script stopped early; closed by the hourly job) | – | 0.00% | `D2_NO_READING` | 12 / 0 |
+| #16 | Steady rig | site, Pixel 7 | 99.70% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #17 | Rig delivering about 60% | site, iPhone 15 | 60.22% | 60.22% | `S2_PRO_RATA` | 4.7736 / 7.2264 |
+| #18 | Never accepted: expired | command line (probe fell in the page's dark minutes or behind a busy queue, so acceptance was refused and the bond sent back) | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #19 | Pool outage, no report | site, WebKit (test script stopped early; closed by the hourly job) | – | 0.00% | `D2_NO_READING` | 12 / 0 |
+| #20 | Pool outage, with outage report | command line | 99.98% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #21 | Pool outage, no report | command line | 59.98% | 59.98% | `S2_PRO_RATA` | 4.8024 / 7.1976 |
+| #22 | Never accepted: expired | site, Firefox (test script stopped after the first waiver; settled from the command line) | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #23 | Rig delivering about 60% | command line | 62.16% | 62.16% | `S2_PRO_RATA` | 4.5408 / 7.4592 |
+| #24 | Never accepted: expired | site, Chrome (test script stopped early; closed by the hourly job) | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #25 | Steady rig | command line | 99.02% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #26 | Rig idles 2 of 5 minutes, pool hides them | command line | 60.00% | 60.00% | `S2_PRO_RATA` | 4.8 / 7.2 |
+| #27 | Never accepted: expired | site, Pixel 7 (test script stopped after the first waiver; settled from the command line) | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #28 | Seller never shows | command line | 0.00% | 0.00% | `Z1_WORKER_NOT_LISTED` | 12 / 0 |
+| #29 | Never accepted: expired | site, iPhone 15 (test script stopped after the first waiver; settled from the command line) | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #30 | Steady rig | daily canary (GitHub Actions) | 99.02% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #31 | Rig delivering about 60% | daily canary (GitHub Actions) | 62.16% | 62.16% | `S2_PRO_RATA` | 4.5408 / 7.4592 |
+| #32 | Seller never shows | daily canary (GitHub Actions) | 0.00% | 0.00% | `Z1_WORKER_NOT_LISTED` | 12 / 0 |
+| #33 | Pool page goes dark | command line | – | 100.00% | `D1_METER_DARK_AFTER_WINDOW` | 0 / 12 |
+| #35 | Pool outage, with outage report | site, WebKit (test script stopped after the outage report; settled from the command line) | 99.86% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #36 | Rig delivering about 60% | site, Firefox (test script stopped after the first waiver; settled from the command line) | 60.94% | 60.94% | `S2_PRO_RATA` | 4.6872 / 7.3128 |
+| #37 | Rig idles 2 of 5 minutes, pool hides them | site, Pixel 7 (test script stopped after the first waiver; settled from the command line) | 59.88% | 59.88% | `S2_PRO_RATA` | 4.8144 / 7.1856 |
+| #38 | Steady rig | site, iPhone 15 (test script stopped after the first waiver; settled from the command line) | 99.48% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #39 | Pool outage, with outage report | site, WebKit | 99.92% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #40 | Rig delivering about 60% | site, Firefox | 59.64% | 59.64% | `S2_PRO_RATA` | 4.8432 / 7.1568 |
+| #41 | Rig idles 2 of 5 minutes, pool hides them | site, Pixel 7 | 59.84% | 59.84% | `S2_PRO_RATA` | 4.8192 / 7.1808 |
+| #42 | Steady rig | site, iPhone 15 | 99.76% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #43 | Seller never shows | site, Chrome | 0.00% | 0.00% | `Z1_WORKER_NOT_LISTED` | 12 / 0 |
+
+#34 is the hourly ready rental that was waiting for a visitor when this table was printed; the hourly job keeps one open.
+
+What the runs show:
+
+- **Same input, same outcome.** The steady rig was paid in full every time (measured 99.02% to 99.76%, inside the 3% grace band). The 60% rig settled between 59.64% and 62.16% across eight runs (the fictional page draws 5.7 to 6.3 GH/s each minute, so 57% to 63% is possible), each accepted by the voting validators.
+- **Missing minutes count as zero (new in v2).** On the page that leaves idle minutes out, all five runs paid 59.84% to 60.00%. Under v1's averaging rule the same page would have paid 100%.
+- **Outage evidence works both ways.** Without a report, the pool's two restart minutes cost the seller (59.98% and 60.00%). With the seller's report from the status page, all four rentals settled at 100%, two of them with the report filed through the site.
+- **The safe paths work live.** A dark page gave "no reading" and moved nothing; after the cut-off the default rule paid the seller (#33). A create with a cloud-metadata URL and an accept with the wrong bond were both refused and refunded (#11). Expiry refunded every unaccepted rental, a buyer's cancel refunded the price, and the agreed split paid 75% (#7).
+- **Abandoned rentals close themselves.** Browser tests stopped by a busy Studio queue left rentals behind; the hourly job expired the unaccepted ones and applied the default rule to two that passed their cut-off (#15, #19).
+- **Money is exact.** For every closed agreement the payouts add up to exactly what was locked (the price, plus the bond once accepted), and `get_locked()` equals what the one open ready rental holds (12 GEN).
+- Studio's gateway sometimes answers 502 for a few seconds, and once cancelled a settlement transaction outright (nothing moved; the retry settled). The command-line tools retry; the site explains both outcomes and lets the visitor try again.
 
 ## Tests
 
@@ -107,9 +166,9 @@ Setup: Python 3.12+, `pip install -r requirements.txt` (test tooling pinned to e
 - The agreement view shows the next step and its time, the actions each party may take, the outage reports, no-reading attempts, the full history, and after settlement the share, the payouts and every slot of the window with what the pool showed and what counted.
 - Accessibility: labelled form fields, errors announced to screen readers, transaction progress in a live region, visible keyboard focus, text contrast at WCAG AA in light and dark mode, no sideways scrolling on phones.
 
-E2E_PLACEHOLDER
+Tested end to end through the site with `tests/e2e/site_flow.py` (both parties: create → probe → accept → waive or outage report → settle) against the v2 contract in Chrome, Firefox, WebKit (Safari's engine), an iPhone 15 profile and a Pixel 7 profile: steady, 60%, missing-minute, outage-with-report and no-show rentals all settled through the UI with the expected share, no sideways scrolling, no page errors, and the opened slot table still open after a refresh. `tests/e2e/ready_flow.py` checked that a first-time visitor with no accounts can settle a ready rental from the card (#12). The runs found and fixed three real issues: buttons were briefly clickable on the old state after a transaction (now disabled until the agreement is read again), the outage-report button was offered before the incident could be resolved (now after the window), and the ready card looked at too few agreements under load.
 
-The wallet path was tested with the seller on an injected EIP-1193 wallet that behaves like MetaMask where it matters: it starts on another network, refuses unknown chains until they are added, and refuses to send from an account approved before the Studio network was added (MetaMask's error 4100). The site adds the network first, then asks for the account. METAMASK_PLACEHOLDER
+The wallet path was tested with the seller on an injected EIP-1193 wallet that behaves like MetaMask where it matters: it starts on another network, refuses unknown chains until they are added, and refuses to send from an account approved before the Studio network was added (MetaMask's error 4100). The site adds the network first, then asks for the account. The same connection code passed with the real MetaMask extension in our first GenLayer project.
 
 ## Command line, canary and ready rental
 
@@ -130,7 +189,7 @@ Brilliant Nodes rents hashrate on new coins' launch days. Today that happens on 
 ## Versions
 
 - **v2 (current):** `0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f`. Changes after a review of v1: missing slots count as zero (M1); an unreadable row moves nothing; half-point agreement at the grace edge; a stricter URL filter; capped history.
-- **v1:** `0xE74E206a60DD7e284FF3e0452DB8078a464daa11`, source on the [`v1-contract`](https://github.com/brilliantnodes/rigsettle/tree/v1-contract) branch. 30 live agreements (27 test runs and the first canary), all closed with nothing left locked. V1_PLACEHOLDER
+- **v1:** `0xE74E206a60DD7e284FF3e0452DB8078a464daa11`, source on the [`v1-contract`](https://github.com/brilliantnodes/rigsettle/tree/v1-contract) branch. 30 live agreements (27 test runs and the first canary), all closed with nothing left locked. Its README with all v1 live results is on that branch.
 
 ## Licence
 
