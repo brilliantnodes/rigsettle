@@ -4,7 +4,7 @@
 
 Live site: https://rigsettle.brilliantnodes.com/ · Contract (v2) on GenLayer Studio: [`0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f`](https://explorer-studio.genlayer.com/address/0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f) · MIT licence
 
-> Test GEN on GenLayer Studio only. Every pool, worker and coin in the examples (Fernhollow Pool, Saltmarsh Pool, Quillmoor Pool, Examplecoin) is fictional.
+> Test GEN only, on GenLayer Studio and Testnet Bradbury Phase 2. Every pool, worker and coin in the examples (Fernhollow Pool, Saltmarsh Pool, Quillmoor Pool, Examplecoin) is fictional.
 >
 > **See a result with no wait:** open the site. **See a settlement now** lists one agreement already settled on chain for every outcome (steady, 60%, idle minutes hidden, outage excused, no-show, page dark, agreed split) and the latest settlement from a live reading; each opens instantly. To watch validators settle one live (one to three minutes), use **Watch a live settlement**: a scheduled job keeps a finished fictional rental waiting twice an hour.
 

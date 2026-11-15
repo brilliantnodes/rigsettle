@@ -26,4 +26,4 @@ Each agreement went through the real flow: the buyer locks the price (`create`),
 
 Raw values, including every transaction: [`results/live-cases.json`](results/live-cases.json). Script: [`live_cases.py`](live_cases.py).
 
-The website at rigsettle.brilliantnodes.com stays on GenLayer Studio, where anyone can play both parties with Studio's free test accounts.
+The website shows these five rentals read-only at [rigsettle.brilliantnodes.com/?net=bradbury](https://rigsettle.brilliantnodes.com/?net=bradbury). Playing both parties yourself stays on GenLayer Studio, which has free test accounts.
