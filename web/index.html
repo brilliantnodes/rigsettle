@@ -21,6 +21,7 @@
     </header>
 
     <main>
+      <p class="banner" id="net-banner" role="note" hidden></p>
       <section class="card hero">
         <p class="hook">You rented <b>10&nbsp;GH/s</b>. You got <b>6</b>. Who decides what you owe?</p>
         <p>
@@ -33,7 +34,7 @@
           <li><strong>Mine</strong><span>The seller's rigs mine to the buyer's pool for the agreed window.</span></li>
           <li><strong>Settle</strong><span>Validators copy the pool's numbers and must agree within 2 points. The seller gets the delivered share; the buyer gets the rest.</span></li>
         </ol>
-        <p class="small">Test GEN on GenLayer Studio only. Every pool, worker and coin in the examples is fictional.</p>
+        <p class="small" id="test-note">Test GEN on GenLayer Studio. Every pool, worker and coin in the examples is fictional. Also shown live on <a href="?net=bradbury">Testnet Bradbury</a>.</p>
       </section>
 
       <section class="card" aria-labelledby="now-h" id="now-card">
@@ -56,7 +57,7 @@
         <p class="small" id="video-note">Captions are on screen. There is no sound.</p>
       </section>
 
-      <section class="card" aria-labelledby="acct-h">
+      <section class="card writes" aria-labelledby="acct-h">
         <h2 id="acct-h">1. Accounts</h2>
         <p class="small">
           Play both parties in this browser, or connect MetaMask for one role. Temporary accounts are made in this browser only, hold test GEN from
@@ -90,7 +91,7 @@
         <p class="error" id="acct-error" role="alert" hidden></p>
       </section>
 
-      <section class="card" aria-labelledby="new-h">
+      <section class="card writes" aria-labelledby="new-h">
         <h2 id="new-h">2. New rental (buyer)</h2>
         <div class="examples">
           <span class="small">Fill in a fictional example:</span>
@@ -132,7 +133,7 @@
         </form>
       </section>
 
-      <section class="card" aria-labelledby="ready-h">
+      <section class="card writes" aria-labelledby="ready-h">
         <h2 id="ready-h">Watch a live settlement</h2>
         <p class="small">Optional. These fictional rentals have finished their window, so you can ask the validators to settle one now. GenLayer validators each read the pool page, which takes one to three minutes; the cases under "See a settlement now" are already settled if you prefer not to wait.</p>
         <div id="ready" class="ready" aria-live="polite"><p class="small">Loading…</p></div>

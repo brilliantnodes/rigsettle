@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "postinstall": "node scripts/patch-genlayer-v2.mjs"
   },
   "dependencies": {
-    "genlayer-js": "^1.1.8"
+    "genlayer-js": "1.1.8",
+    "genlayer-js-v2": "npm:genlayer-js@2.0.0-rc.2"
   },
   "devDependencies": {
     "vite": "^6.0.0"

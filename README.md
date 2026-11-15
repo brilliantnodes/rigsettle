@@ -89,6 +89,8 @@ Demo rentals use five 1-minute slots so a full lifecycle takes about 15 minutes;
 
 The same contract (GenVM v0.6 build; the same 163 tests pass on both runtimes) is live on Bradbury Phase 2 at [`0xD3c8…fcd8`](https://scan.bradbury.genlayer.com/address/0xD3c85288A22FC33961eD80CcE54F7b90A0Aafcd8). Five cases went through the full flow there, each step decided by 5 validators: steady rig 100%, rig at about 60% paid 60.82%, a pool outage excused by the status page 100%, a seller who never showed 0%, and an agreed 75% split. After the settlements finalized, the seller's balance rose by exactly the sum of its payouts. Details and transaction links: [`bradbury/README.md`](bradbury/README.md).
 
+The website shows this record too: switch to **Bradbury testnet** at the top of the page, or open [rigsettle.brilliantnodes.com/?net=bradbury](https://rigsettle.brilliantnodes.com/?net=bradbury). It is read-only there (no wallet needed); each rental lists every step with a link to the Bradbury explorer. Trying the steps yourself stays on Studio, which has free temporary accounts.
+
 ## Live results on Studio (v2)
 
 Contract `0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f`, 14 November 2026. Every rental used the fictional demo pools, five 1-minute slots, a 10 GEN price and a 2 GEN bond. The table is printed from the chain by `tools/results_table.py`; only the "Run through" column is written by hand.

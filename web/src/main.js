@@ -1,6 +1,12 @@
 import { createClient, createAccount, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import { CONTRACT_ADDRESS, NETWORK_NAME, EXPLORER_BASE, REPO_URL, DEMO, EXAMPLES } from "./config.js";
+import { NET, NETWORKS, CONTRACT_ADDRESS, NETWORK_NAME, EXPLORER_BASE, REPO_URL, DEMO, EXAMPLES } from "./config.js";
+
+// Bradbury Phase 2 needs genlayer-js 2; Studio stays on genlayer-js 1, which
+// Studio's RPC supports. The Bradbury view only reads, so it needs no wallet.
+const BRADBURY = NET.key === "bradbury";
+const v2 = BRADBURY ? await import("genlayer-js-v2") : null;
+const v2chains = BRADBURY ? await import("genlayer-js-v2/chains") : null;
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -10,7 +16,7 @@ const el = (tag, cls, text) => {
   return n;
 };
 const RPC = studionet.rpcUrls.default.http[0];
-const reader = createClient({ chain: studionet });
+const reader = BRADBURY ? v2.createClient({ chain: v2chains.testnetBradbury, endpoint: NET.rpc }) : createClient({ chain: studionet });
 
 // GenLayer returns maps and big integers. Amounts arrive as strings already.
 function plain(v) {
@@ -500,6 +506,26 @@ const REASON_TEXT = {
 };
 
 function renderAgreement(a) {
+  renderAgreementBody(a);
+  if (NET.txs && NET.txs[String(a.id)]) {
+    const d = el("div", "txs");
+    d.append(el("h3", null, "Every step on the Bradbury explorer"));
+    const ol = el("ol");
+    NET.txs[String(a.id)].forEach(([what, hash]) => {
+      const li = el("li");
+      const link = el("a", null, `${hash.slice(0, 10)}…${hash.slice(-6)}`);
+      link.href = `${EXPLORER_BASE}/tx/${hash}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      li.append(el("span", null, `${what}: `), link);
+      ol.append(li);
+    });
+    d.append(ol);
+    $("ag-view").append(d);
+  }
+}
+
+function renderAgreementBody(a) {
   const box = $("ag-view");
   box.replaceChildren();
   const t = a.terms;
@@ -674,7 +700,7 @@ function resultView(a) {
   const b2 = el("div"); b2.append(el("span", "small", "Seller receives"), el("b", null, gen(r.paid_seller)));
   pay.append(b1, b2);
   wrap.append(pay);
-  wrap.append(el("p", "small", "Payouts are sent when the settlement transaction is finalized, after GenLayer's appeal window (under a minute on Studio)."));
+  wrap.append(el("p", "small", "Payouts are sent when the settlement transaction is finalized, after GenLayer's appeal window (under a minute on Studio, about twelve minutes on Bradbury)."));
   const rd = r.reading;
   if (rd && rd.kind === "READ" && rd.listed) {
     const t = a.terms;
@@ -894,7 +920,33 @@ async function loadRules() {
 
 // --------------------------------------------------------------- boot
 
-$("net").append(el("span", "dot"), el("span", null, NETWORK_NAME));
+// Network switch: one network per page load, chosen with ?net=studio or ?net=bradbury.
+const net = $("net");
+net.append(el("span", "dot"));
+Object.values(NETWORKS).forEach((n) => {
+  if (n.key === NET.key) {
+    const cur = el("strong", null, n.label);
+    cur.setAttribute("aria-current", "true");
+    net.append(cur);
+  } else {
+    const a = el("a", null, n.label);
+    a.href = `?net=${n.key}`;
+    a.title = `Switch to ${n.name}`;
+    net.append(a);
+  }
+});
+if (NET.readOnly) {
+  document.body.classList.add("readonly");
+  const b = $("net-banner");
+  b.hidden = false;
+  b.replaceChildren(
+    el("strong", null, "Testnet Bradbury Phase 2, read-only. "),
+    el("span", null, "GenLayer's public testnet. Each rental below was run end to end there with two testnet wallets: create, pool check, accept, settle by a majority of independent validators, and payout in test GEN. "),
+    Object.assign(el("a", null, "Try every step free on Studio"), { href: "?net=studio" }),
+  );
+  $("ag-view").replaceChildren(el("p", "small", "Open a rental from the table above or the list below."));
+  $("test-note").textContent = "Test GEN on GenLayer Testnet Bradbury Phase 2. Every pool, worker and coin in the examples is fictional.";
+}
 const fc = $("foot-contract");
 fc.append(el("span", null, "Contract: "));
 const ca = el("a", null, CONTRACT_ADDRESS);
@@ -903,7 +955,7 @@ ca.target = "_blank";
 ca.rel = "noopener noreferrer";
 fc.append(ca);
 $("foot-repo").href = REPO_URL;
-for (const role of ["buyer", "seller"]) if (store.get(`rigsettle.temp.${role}`)) tempAccount(role);
+if (!NET.readOnly) for (const role of ["buyer", "seller"]) if (store.get(`rigsettle.temp.${role}`)) tempAccount(role);
 fetch("./rigsettle-demo.mp4", { method: "HEAD" }).then((r) => { if (r.ok) $("video-card").hidden = false; }).catch(() => {});
 const q = new URLSearchParams(location.search).get("a");
 if (q) { $("ag-id").value = q; openAgreement(q); }

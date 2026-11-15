@@ -1,5 +1,7 @@
 # RigSettle on Testnet Bradbury Phase 2
 
+On the website: [rigsettle.brilliantnodes.com/?net=bradbury](https://rigsettle.brilliantnodes.com/?net=bradbury) shows these five rentals read-only, with explorer links for every step.
+
 RigSettle also runs on **GenLayer Testnet Bradbury Phase 2** (chain 4221), whose validators use real models and real web access, with **real GEN payouts**. Recorded 15 Nov 2026 with two throwaway accounts holding faucet GEN (buyer `0x77F1…2734`, seller `0xF5d9…eDb7`); fictional pools only, on our demo pages.
 
 - Contract: [`0xD3c85288A22FC33961eD80CcE54F7b90A0Aafcd8`](https://scan.bradbury.genlayer.com/address/0xD3c85288A22FC33961eD80CcE54F7b90A0Aafcd8) (deploy [0x906e…3c04](https://scan.bradbury.genlayer.com/tx/0x906e90c2aee013478e20f055c53fb9dfb4452b77a68718b20b4492be93da3c04), 5 of 5 validators).
