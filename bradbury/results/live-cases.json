@@ -1,0 +1,297 @@
+{
+  "network": "testnet-bradbury-phase-2",
+  "chain_id": 4221,
+  "address": "0xD3c85288A22FC33961eD80CcE54F7b90A0Aafcd8",
+  "buyer": "0x77F1635B8F2eca3b7Eb46fB2534B7Fa18aCd2734",
+  "seller": "0xF5d92105174434618ae0f0E0C65D50Ae6d57eDb7",
+  "price_wei": "2000000000000000000",
+  "bond_wei": "1000000000000000000",
+  "window": [
+    1794767340,
+    1794767640
+  ],
+  "cases": {
+    "steady": {
+      "id": "1",
+      "create": {
+        "tx": "0x5be065f33a8db5ac8b3b30921a00c6ea915396b16150e73a799184f182265cf3",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "probe": {
+        "tx": "0x08b0f7341250b9e1b4c09a4a165df1099e54cded6c2ce7d1d1a50fe69caebea1",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null,
+        "probe": {
+          "at": 1794766031,
+          "ok": true,
+          "reason": "READABLE"
+        }
+      },
+      "accept": {
+        "tx": "0xdea2f4c8ec588f1aabb2e9b84ffe6542abdc9c6c9de10f132fd5fc5a555d3db2",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state_after_accept": "ACTIVE",
+      "settle": {
+        "tx": "0x54b5efca08af704602910bf1551909d264dc41177c7ea529d8fc9198c8fe1892",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state": "SETTLED",
+      "rule": "G1_WITHIN_GRACE",
+      "share_bp": 10000,
+      "paid_buyer": "0",
+      "paid_seller": "3000000000000000000",
+      "excused_slots": 0,
+      "ok": true
+    },
+    "sixty": {
+      "id": "2",
+      "create": {
+        "tx": "0x0dcbdb9f071060b2f668f2e3956b3cc629bfb6a07a91ce0fd443aaef68f0b1be",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "probe": {
+        "tx": "0x0bb04f4df1f19cc42a39a42ab946e53eb90c8366ffd6aa59128e51b82eca4fdc",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null,
+        "probe": {
+          "at": 1794766137,
+          "ok": true,
+          "reason": "READABLE"
+        }
+      },
+      "accept": {
+        "tx": "0xd8c561aa689ec43c02fb2b6554a067c6023ef1475a0fe49130da11c7e41f2826",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state_after_accept": "ACTIVE",
+      "settle": {
+        "tx": "0x8079ac0ce0bff825c51d718ad96b08f8c67274ebbb9410bf2dba1236497585eb",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state": "SETTLED",
+      "rule": "S2_PRO_RATA",
+      "share_bp": 6082,
+      "paid_buyer": "1175400000000000000",
+      "paid_seller": "1824600000000000000",
+      "excused_slots": 0,
+      "ok": true
+    },
+    "outage_evidence": {
+      "id": "3",
+      "create": {
+        "tx": "0x96253f588b379424f81a5e8dee64c7b075c9881dab2fd949cecdf280be29dfe2",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "probe": {
+        "tx": "0x82d6046ba1f765a22ba91383f3d84ed0dc624834cc1645888e37242ec28364c6",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null,
+        "probe": {
+          "at": 1794766226,
+          "ok": true,
+          "reason": "READABLE"
+        }
+      },
+      "accept": {
+        "tx": "0x246276e51b37efc63a19aa9e30bdc426d7a21375fb19cf4b265826223c89444b",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state_after_accept": "ACTIVE",
+      "evidence": {
+        "tx": "0x3f94ec66613edc775af4163896bb667f115e91b2cb6172059a5859fd7d94a0e1",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "evidence_recorded": {
+        "buyer": null,
+        "seller": {
+          "at": 1794767663,
+          "intervals": [
+            [
+              1794767340,
+              1794767400
+            ],
+            [
+              1794767580,
+              1794767640
+            ]
+          ],
+          "url": "https://rigsettle.brilliantnodes.com/demo/saltmarsh-status/"
+        }
+      },
+      "settle": {
+        "tx": "0xace03e0853eb41e7bf973e986775fca69ca7535abdb51c569963f1dfcc46780a",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state": "SETTLED",
+      "rule": "G1_WITHIN_GRACE",
+      "share_bp": 10000,
+      "paid_buyer": "0",
+      "paid_seller": "3000000000000000000",
+      "excused_slots": 2,
+      "ok": true
+    },
+    "ghost": {
+      "id": "4",
+      "create": {
+        "tx": "0x3ff488ce8dd4de02741481d144f755d0a6cd99e7703c1d4cc805c12dc4c7f75a",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "probe": {
+        "tx": "0xc4c2c3e2faea58ed2b7e2bd393b553de916cf398ace0ba1492aab9f5cfb82a55",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null,
+        "probe": {
+          "at": 1794766315,
+          "ok": true,
+          "reason": "READABLE"
+        }
+      },
+      "accept": {
+        "tx": "0x7376d600c6de73a9a9e3a005c8763c570329853084c864e2bbaa8b7f5fac694c",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state_after_accept": "ACTIVE",
+      "settle": {
+        "tx": "0x7c036d54b842f3feada13167aef38922c9ee6551cf7163c587ea6e296dafb7a7",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state": "SETTLED",
+      "rule": "Z1_WORKER_NOT_LISTED",
+      "share_bp": 0,
+      "paid_buyer": "3000000000000000000",
+      "paid_seller": "0",
+      "excused_slots": 0,
+      "ok": true
+    },
+    "release": {
+      "id": "5",
+      "create": {
+        "tx": "0xe679463cfb45626971d9b3e2871a9780bb7508fd634a8fa674c17d06b3954932",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "probe": {
+        "tx": "0x5a6b1978997975febc87da5ef26d39ddc71fd0650a05a96f04e0a791b4236e0f",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null,
+        "probe": {
+          "at": 1794766431,
+          "ok": true,
+          "reason": "READABLE"
+        }
+      },
+      "accept": {
+        "tx": "0x2785003fcf13a314bed032702a113f5e2d82450e714889f6c3b414a2ed5e86e2",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state_after_accept": "ACTIVE",
+      "release_buyer": {
+        "tx": "0x58964c0d64280c2f8ccffe07c0c9497a7cde3d70d6f2b8e102b62b1fda1e6eca",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "release_seller": {
+        "tx": "0x734af7ed08a0f31338e673f0aca3fd8fa07af555bc7e1cc1792e4db5be94d13a",
+        "result": "MAJORITY_AGREE",
+        "execution": "FINISHED_WITH_RETURN",
+        "votes": "5",
+        "validators": "5",
+        "error": null
+      },
+      "state": "RELEASED",
+      "rule": "R1_AGREED_SPLIT",
+      "share_bp": 7500,
+      "paid_buyer": "750000000000000000",
+      "paid_seller": "2250000000000000000",
+      "excused_slots": null,
+      "ok": true
+    }
+  },
+  "seller_txs_final": true,
+  "seller_balance_before_settle": "7248901271589984885",
+  "settle_txs_final": true,
+  "seller_balance_after_settle": "15073501271589984885",
+  "seller_received": "7824600000000000000",
+  "seller_expected": "7824600000000000000",
+  "payouts_arrived": true,
+  "locked_after": "0",
+  "count": 5
+}
