@@ -62,6 +62,19 @@ def tidy(c):
             print(f"#{aid} not tidied: {str(e)[:200]}")
 
 
+def active(c, aid, seller, tries=10):
+    """True once the agreement reads ACTIVE with this seller (reads can lag a write)."""
+    for _ in range(tries):
+        try:
+            a = read(c, ADDR, "get_agreement", [aid])
+            if a["state"] == "ACTIVE" and a["seller"].lower() == seller.lower():
+                return True
+        except Exception:
+            pass
+        time.sleep(3)
+    return False
+
+
 def create_ready():
     cb, buyer = client()
     cs, seller = client()
@@ -78,7 +91,10 @@ def create_ready():
     print(f"#{aid} probe: {r['result']}")
     tx, r = write(cs, ADDR, "accept", [aid], value=2 * G)
     print(f"#{aid} accept: {r['result']}")
-    if not (isinstance(r["result"], dict) and r["result"].get("ok")):
+    # Judge by the agreement, not the reply: when Studio's gateway errors after
+    # a write has gone through, write() sends it again, and the duplicate is
+    # refused as "not open" although the first accept succeeded (15 Nov, #81).
+    if not active(cs, aid, seller.address):
         raise SystemExit(f"accept failed: {r}")
     write(cb, ADDR, "waive_evidence", [aid])
     write(cs, ADDR, "waive_evidence", [aid])

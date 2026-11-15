@@ -43,7 +43,8 @@ def meter_answer(rates, kind="worker_stats", pool="Fernhollow Pool", utc="yes", 
 
 
 def status_answer(incidents, readable="yes", own="yes"):
-    return json.dumps({"readable": readable, "is_status_page_of_pool": own, "incidents": incidents})
+    # fenced like the meter answers, so both the v0.2 and the v0.6 test VMs hand the text through
+    return "```json\n" + json.dumps({"readable": readable, "is_status_page_of_pool": own, "incidents": incidents}) + "\n```"
 
 
 class Sent:
@@ -53,8 +54,10 @@ class Sent:
         self.items = []
 
     def __call__(self, vm, request):
-        if isinstance(request, dict) and "EthSend" in request:
-            d = request["EthSend"]
+        # GenVM v0.2 (Studio) names a transfer EthSend; v0.6 (Bradbury) EmitExternalMessage.
+        key = "EmitExternalMessage" if isinstance(request, dict) and "EmitExternalMessage" in request else "EthSend"
+        if isinstance(request, dict) and key in request:
+            d = request[key]
             self.items.append((d["address"].as_hex, int(d["value"])))
             return {"ok": None}
         return None
