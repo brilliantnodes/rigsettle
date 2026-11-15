@@ -6,9 +6,9 @@
     <title>RigSettle: hashrate rentals settled by validators</title>
     <meta name="description" content="Rent hashrate without trusting the other side. The payment is locked in a GenLayer Intelligent Contract, validators read the buyer's pool, and code splits the escrow by what was delivered." />
     <link rel="icon" href="./logo.svg" type="image/svg+xml" />
-    <script type="module" crossorigin src="./assets/index-CDNv2Sh2.js"></script>
+    <script type="module" crossorigin src="./assets/index-HHHRJEAO.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/genlayer-nFUEOS6W.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-CsH3qxpQ.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-DtWiuISl.css">
   </head>
   <body>
     <header class="top">
@@ -36,6 +36,18 @@
           <li><strong>Settle</strong><span>Validators copy the pool's numbers and must agree within 2 points. The seller gets the delivered share; the buyer gets the rest.</span></li>
         </ol>
         <p class="small">Test GEN on GenLayer Studio only. Every pool, worker and coin in the examples is fictional.</p>
+      </section>
+
+      <section class="card" aria-labelledby="now-h" id="now-card">
+        <h2 id="now-h">See a settlement now</h2>
+        <p class="small">No waiting: every case below was already settled on chain by GenLayer validators. Open one to see the reading they agreed, the rule that applied and the payout.</p>
+        <div id="latest-settled" class="ready" aria-live="polite"></div>
+        <div class="table-wrap">
+          <table class="outcomes">
+            <thead><tr><th scope="col">Case (fictional)</th><th scope="col">Outcome</th><th scope="col">To seller</th><th scope="col"><span class="sr">Open</span></th></tr></thead>
+            <tbody id="examples"><tr><td colspan="4" class="small">Loading…</td></tr></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="card" aria-labelledby="video-h" id="video-card" hidden>
@@ -123,8 +135,8 @@
       </section>
 
       <section class="card" aria-labelledby="ready-h">
-        <h2 id="ready-h">Ready to settle now</h2>
-        <p class="small">Skip the wait: these fictional rentals have finished their window, so you can ask the validators to settle one right away.</p>
+        <h2 id="ready-h">Watch a live settlement</h2>
+        <p class="small">Optional. These fictional rentals have finished their window, so you can ask the validators to settle one now. GenLayer validators each read the pool page, which takes one to three minutes; the cases under "See a settlement now" are already settled if you prefer not to wait.</p>
         <div id="ready" class="ready" aria-live="polite"><p class="small">Loading…</p></div>
       </section>
 

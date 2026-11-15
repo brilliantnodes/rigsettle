@@ -100,7 +100,7 @@ def header(pool):
 FICTION = ('<p class="note">This is a fictional pool page made for the RigSettle demo. '
            '{pool} and Examplecoin do not exist. Nothing here is a real service.</p>')
 
-def worker_page(pool, worker, mode, seed, rows=40, extra_note=""):
+def worker_page(pool, worker, mode, seed, rows=200, extra_note=""):
     body = f"""{header(pool)}<main>
 <h1>Worker statistics: {worker}</h1>
 <p>Pool: <b>{pool}</b> &middot; Coin: Examplecoin (fictional) &middot; Worker: <b>{worker}</b></p>
@@ -150,7 +150,7 @@ def dark_page(pool, worker, seed):
 </div>
 <p class="note">Demo schedule: this fictional statistics service is down from 6 to 9 minutes past every ten. Checked at <span id="updated2"></span>.</p>
 {FICTION.format(pool=pool)}</main>"""
-    cfg = f"var MODE=\"dark\";var SEED={seed};var ROWS=40;"
+    cfg = f"var MODE=\"dark\";var SEED={seed};var ROWS=200;"
     return page(f"{pool} - worker {worker} (fictional demo)", body, DARK_JS, cfg)
 
 

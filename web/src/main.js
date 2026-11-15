@@ -1,6 +1,6 @@
 import { createClient, createAccount, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import { CONTRACT_ADDRESS, NETWORK_NAME, EXPLORER_BASE, REPO_URL, DEMO } from "./config.js";
+import { CONTRACT_ADDRESS, NETWORK_NAME, EXPLORER_BASE, REPO_URL, DEMO, EXAMPLES } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -286,11 +286,13 @@ async function send(who, functionName, args, value, what) {
   tl.rel = "noopener noreferrer";
   $("life-hash").append(el("span", null, "Transaction: "), el("code", null, hash), el("span", null, " · "), tl);
   drawSteps("SENT", false);
-  $("life-note").textContent = "Sent. Simple steps take under a minute; steps where validators read a page take one to four minutes.";
+  const waitNote = "Simple steps take under a minute; steps where validators read a page take one to three minutes.";
+  $("life-note").textContent = `Sent. ${waitNote}`;
   let last = "SENT", final = null;
   const t0 = Date.now();
   while (Date.now() - t0 < 8 * 60 * 1000) {
     await new Promise((r) => setTimeout(r, 3000));
+    $("life-note").textContent = `Sent ${Math.round((Date.now() - t0) / 1000)} s ago. ${waitNote}`;
     let tx;
     try { tx = await reader.getTransaction({ hash }); } catch { continue; }
     const st = statusOf(tx);
@@ -471,6 +473,25 @@ const RULE_TEXT = {
   CANCELLED_BY_BUYER: "The buyer cancelled before the seller accepted.",
   EXPIRED_UNACCEPTED: "The seller did not accept in time.",
 };
+// Short labels for lists. Every settled outcome names what happened, so a
+// refund after the cut-off never reads like a failed delivery.
+const RULE_LABEL = {
+  G1_WITHIN_GRACE: "Full delivery (within grace)",
+  S2_PRO_RATA: "Paid pro rata",
+  Z1_WORKER_NOT_LISTED: "No-show: buyer refunded",
+  D1_METER_DARK_AFTER_WINDOW: "Meter dark: seller paid",
+  D2_NO_READING: "Refunded: nobody settled before the cut-off",
+  R1_AGREED_SPLIT: "Agreed split",
+  CANCELLED_BY_BUYER: "Cancelled by the buyer",
+  EXPIRED_UNACCEPTED: "Expired: seller did not accept",
+};
+function outcomeText(a) {
+  const res = a.result || {};
+  if (!res.rule) return "";
+  const label = RULE_LABEL[res.rule] || res.rule;
+  if (res.share_bp === undefined || ["D2_NO_READING", "Z1_WORKER_NOT_LISTED"].includes(res.rule)) return label;
+  return `${label} · ${(res.share_bp / 100).toFixed(2)}% to seller`;
+}
 const REASON_TEXT = {
   N1_METER_DARK: "the pool page could not be read as this pool's worker page (meter dark)",
   N2_FORMAT: "the page's rows did not fit the terms (times not UTC, misaligned or conflicting rows)",
@@ -744,9 +765,12 @@ function showReady(list) {
   const box = $("ready");
   box.replaceChildren();
   const now = nowS();
-  const ready = list.filter((a) => a.state === "ACTIVE" && now >= times(a).settleAt && now < times(a).cutoff).slice(0, 2);
+  // Only rentals whose whole window is still on the demo meter page (it lists
+  // the last 200 minutes), so every listed rental can be settled from a reading.
+  const onMeter = (a) => now < times(a).end + METER_MINUTES * 60;
+  const ready = list.filter((a) => a.state === "ACTIVE" && now >= times(a).settleAt && now < times(a).cutoff && onMeter(a)).slice(0, 2);
   if (!ready.length) {
-    box.append(el("p", "small", "No rental is ready this minute. A new one is created every hour and opens for settlement about ten minutes later. You can also create your own above."));
+    box.append(el("p", "small", "No rental is ready this minute. A new one is created twice an hour and opens for settlement about ten minutes later. The settled cases at the top of the page need no wait."));
     return;
   }
   ready.forEach((a) => {
@@ -760,7 +784,65 @@ function showReady(list) {
     row.append(b);
     box.append(row);
   });
-  box.append(el("p", "small", "Fictional rig delivering about 60%, created by an hourly job with two throwaway accounts. Settling uses a temporary account in this browser if you have none. The validators read the pool page in one to three minutes; the result appears below."));
+  box.append(el("p", "small", "Fictional rig delivering about 60%, created twice an hour by a scheduled job with two throwaway accounts. Settling uses a temporary account in this browser if you have none. The validators read the pool page in one to three minutes; the result appears below."));
+}
+
+// ------------------------------------------------ see a settlement now
+
+const METER_MINUTES = 195; // the demo worker pages list 200 one-minute rows
+
+function openFromList(id) {
+  $("ag-id").value = id;
+  openAgreement(id);
+  $("ag-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function settledAt(a) {
+  const h = (a.history || []).filter((x) => String(x.action).startsWith("settle"));
+  return h.length ? h[h.length - 1].at : null;
+}
+
+function showLatestSettled(list) {
+  const box = $("latest-settled");
+  box.replaceChildren();
+  const a = list.find((x) => x.state === "SETTLED" && x.result && x.result.reading && x.result.reading.kind === "READ");
+  if (!a) return;
+  const row = el("div", "ready-row");
+  const at = settledAt(a);
+  row.append(el("span", null, `Latest settlement from a live reading: #${a.id} · ${a.terms.worker_name}${at ? ` · settled ${utcFull(at)}` : ""} · ${outcomeText(a)}`));
+  const b = el("button", "secondary", `Open #${a.id}`);
+  b.type = "button";
+  b.addEventListener("click", () => openFromList(a.id));
+  row.append(b);
+  box.append(row);
+}
+
+async function loadExamples() {
+  const body = $("examples");
+  const rows = await Promise.all(EXAMPLES.map(async (x) => {
+    try { return { x, a: await read("get_agreement", [x.id]) }; } catch { return { x, a: null }; }
+  }));
+  body.replaceChildren();
+  rows.forEach(({ x, a }) => {
+    const tr = el("tr");
+    const name = el("td");
+    name.append(el("span", null, x.label), el("br"), el("span", "small", `#${x.id}`));
+    tr.append(name);
+    if (!a || !a.result) {
+      tr.append(el("td", "small", "could not be read"), el("td"), el("td"));
+    } else {
+      const r = a.result;
+      tr.append(el("td", null, RULE_LABEL[r.rule] || r.rule), el("td", null, r.share_bp !== undefined ? `${(r.share_bp / 100).toFixed(2)}%` : "–"));
+      const td = el("td");
+      const b = el("button", "secondary", "Open");
+      b.type = "button";
+      b.setAttribute("aria-label", `Open agreement ${x.id}: ${x.label}`);
+      b.addEventListener("click", () => openFromList(x.id));
+      td.append(b);
+      tr.append(td);
+    }
+    body.append(tr);
+  });
 }
 
 async function loadRecent() {
@@ -768,6 +850,7 @@ async function loadRecent() {
   try {
     const all = await read("get_latest", [50]); // the contract's maximum
     showReady(all);
+    showLatestSettled(all);
     const list = all.slice(0, 20);
     const box = $("recent");
     box.replaceChildren();
@@ -777,8 +860,8 @@ async function loadRecent() {
       b.type = "button";
       const res = a.result || {};
       b.append(el("span", `badge ${a.state}`, a.state), el("strong", null, `#${a.id}`), el("span", null, `${a.terms.pool_name} · ${a.terms.worker_name}`));
-      if (res.share_bp !== undefined) b.append(el("span", "small", `${(res.share_bp / 100).toFixed(2)}% to seller`));
-      b.addEventListener("click", () => { $("ag-id").value = a.id; openAgreement(a.id); $("ag-card").scrollIntoView({ behavior: "smooth" }); });
+      if (res.rule) b.append(el("span", "small", outcomeText(a)));
+      b.addEventListener("click", () => openFromList(a.id));
       box.append(b);
     });
   } catch (e) {
@@ -824,5 +907,6 @@ for (const role of ["buyer", "seller"]) if (store.get(`rigsettle.temp.${role}`))
 fetch("./rigsettle-demo.mp4", { method: "HEAD" }).then((r) => { if (r.ok) $("video-card").hidden = false; }).catch(() => {});
 const q = new URLSearchParams(location.search).get("a");
 if (q) { $("ag-id").value = q; openAgreement(q); }
+loadExamples();
 loadRecent();
 loadRules();

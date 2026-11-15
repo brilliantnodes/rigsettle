@@ -1,11 +1,12 @@
 name: Ready rental
 
-# Every hour: settle or expire anything left idle, then create one fictional
-# "rig delivering about 60%" rental that is ready to settle about 10 minutes
-# later, so visitors can watch a settlement without waiting for a new window.
+# Twice an hour (a skipped GitHub run no longer leaves the list stale): settle
+# or expire anything left idle, then create one fictional "rig delivering about
+# 60%" rental that is ready to settle about 10 minutes later, so visitors can
+# watch a settlement without waiting for a new window.
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
 
 permissions:

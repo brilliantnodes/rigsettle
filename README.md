@@ -6,7 +6,7 @@ Live site: https://rigsettle.brilliantnodes.com/ · Contract (v2) on GenLayer St
 
 > Test GEN on GenLayer Studio only. Every pool, worker and coin in the examples (Fernhollow Pool, Saltmarsh Pool, Quillmoor Pool, Examplecoin) is fictional.
 >
-> **Try it in three minutes:** open the site and use **Ready to settle now**. An hourly job keeps a finished fictional rental waiting, so you can watch the validators read the pool and split the escrow without waiting for a new window.
+> **See a result with no wait:** open the site. **See a settlement now** lists one agreement already settled on chain for every outcome (steady, 60%, idle minutes hidden, outage excused, no-show, page dark, agreed split) and the latest settlement from a live reading; each opens instantly. To watch validators settle one live (one to three minutes), use **Watch a live settlement**: a scheduled job keeps a finished fictional rental waiting twice an hour.
 
 ## The trust problem
 
@@ -83,7 +83,7 @@ Hosted with the site under [`/demo/`](https://rigsettle.brilliantnodes.com/demo/
 | Saltmarsh status page | lists each stratum restart (two minutes, every five minutes) and some website-only notices |
 | Quillmoor `rig-dark` | readable, but the statistics service is down 6–9 minutes past every ten |
 
-Demo rentals use five 1-minute slots so a full lifecycle takes about 15 minutes; **Ready to settle now** skips the wait. Real rentals use hourly slots (see `examples/terms-hourly.example.json`).
+Demo rentals use five 1-minute slots so a full lifecycle takes about 15 minutes; **See a settlement now** shows finished ones and **Watch a live settlement** skips the wait for a new window. Real rentals use hourly slots (see `examples/terms-hourly.example.json`).
 
 ## Live results on Studio (v2)
 
@@ -160,7 +160,8 @@ Setup: Python 3.12+, `pip install -r requirements.txt` (test tooling pinned to e
 
 `web/` is a static Vite app using `genlayer-js`; `npm run build` writes to `docs/`, which GitHub Pages serves. The library sits in its own long-cached chunk (122 kB gzipped); the app itself is 11 kB gzipped and the page text renders before either loads.
 
-- **Ready to settle now:** finished fictional rentals waiting for settlement, one click to watch the validators settle one (a temporary account is made if you have none).
+- **See a settlement now:** one settled agreement per outcome, plus the latest settlement from a live reading; each opens instantly, with no transaction.
+- **Watch a live settlement:** finished fictional rentals waiting for settlement, one click to watch the validators settle one (a temporary account is made if you have none). Only rentals whose whole window is still on the demo meter page are listed; the demo worker pages show the last 200 minutes, longer than the 180-minute cut-off, so every listed rental can be settled from a reading.
 - Two roles in one page: play both parties with two temporary accounts funded from Studio's built-in faucet, or connect MetaMask for one role (the Studio network is added before the account is requested).
 - Every transaction shows its consensus stages, the hash with an explorer link, and a plain explanation of undetermined, timed-out and refused outcomes, including refunds.
 - The agreement view shows the next step and its time, the actions each party may take, the outage reports, no-reading attempts, the full history, and after settlement the share, the payouts and every slot of the window with what the pool showed and what counted.
@@ -175,7 +176,7 @@ The wallet path was tested with the seller on an injected EIP-1193 wallet that b
 - `tools/rs.py`: deploy, show and list agreements, and run a real rental from the command line (`create terms.json`, `probe`, `accept`, `evidence`, `waive`, `settle`, `default`); the terms file format is in `examples/terms-hourly.example.json`.
 - `tools/live_cases.py`: runs the fictional cases live, side by side, with fresh throwaway accounts.
 - `.github/workflows/canary.yml` runs `tools/canary.py` daily: a steady, a 60% and a no-show rental against the deployed contract; it fails if any outcome changes.
-- `.github/workflows/ready.yml` runs `tools/ready.py` hourly: it settles, expires or defaults anything left idle (so no test GEN stays locked) and creates the next ready-to-settle rental.
+- `.github/workflows/ready.yml` runs `tools/ready.py` twice an hour (07 and 37 minutes past; GitHub sometimes skips a scheduled run): it settles, expires or defaults anything left idle (so no test GEN stays locked) and creates the next ready-to-settle rental.
 - The contract address comes from `web/src/config.js` everywhere, so the site, the tools and the jobs cannot point at different deployments.
 
 ## Use
