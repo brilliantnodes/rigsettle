@@ -33,12 +33,14 @@ from genlayer_py.types import TransactionStatus
 
 ROOT = Path(__file__).resolve().parents[1]
 def _site_address() -> str:
-    """The deployed address the site uses (web/src/config.js)."""
-    try:
-        text = (ROOT / "web" / "src" / "config.js").read_text()
-        return text.split('CONTRACT_ADDRESS = "', 1)[1].split('"', 1)[0]
-    except Exception:
-        return ""
+    """The Studio contract the site uses (the "studio" entry of NETWORKS in
+    web/src/config.js). Fails loudly rather than returning an empty address."""
+    import re
+    text = (ROOT / "web" / "src" / "config.js").read_text()
+    m = re.search(r'studio:\s*\{[^}]*?contract:\s*"(0x[0-9a-fA-F]{40})"', text, re.S)
+    if not m:
+        raise SystemExit("could not find the Studio contract address in web/src/config.js")
+    return m.group(1)
 
 
 DEFAULT_ADDRESS = os.environ.get("RS_ADDRESS") or _site_address()
