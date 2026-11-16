@@ -2,7 +2,7 @@
 
 **Hashrate rentals, settled by GenLayer validators reading the buyer's pool.**
 
-Live site: https://rigsettle.brilliantnodes.com/ · Contract (v2) on GenLayer Studio: [`0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f`](https://explorer-studio.genlayer.com/address/0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f) · MIT licence
+Live site: https://rigsettle.brilliantnodes.com/ · Contract (v3, exact agreement) on GenLayer Studio: [`0x695563599bCFFA6FFE0DEfab906735a939E7C68D`](https://explorer-studio.genlayer.com/address/0x695563599bCFFA6FFE0DEfab906735a939E7C68D) · MIT licence
 
 > Test GEN only, on GenLayer Studio and Testnet Bradbury Phase 2. Every pool, worker and coin in the examples (Fernhollow Pool, Saltmarsh Pool, Quillmoor Pool, Examplecoin) is fictional.
 >
@@ -39,10 +39,10 @@ The model only copies numbers from the page. Every decision is deterministic Pyt
 | **X1 Outage** | A slot is excused only if an outage on the status site named in the terms covers it **and** the meter shows the drop in that slot (a slot missing from the page counts as a drop). Website-only incidents do not count. |
 | **Z1 No-show** | A readable page of the named pool saying the worker does not exist means nothing was delivered. |
 | **N1 Meter dark** | The page cannot be read, is the wrong pool, or says statistics are unavailable: nothing moves; anyone may retry. |
-| **N2 Format** | Times not in UTC, rows off the slot grid, two different values for one slot, or a row in the window whose number or unit cannot be read (for example a decimal comma): nothing moves, because guessing would move money. |
+| **N2 Format** | Times not in UTC, rows off the slot grid, two different values for one slot, or a row in the window whose number or unit cannot be read (for example a decimal comma): nothing moves, because guessing would move money. A row shown as offline and copied as a bare `0` counts as zero for that slot, not as a format error. |
 | **C1 Coverage** | Fewer than half the slots are on the page: nothing moves. This protects a seller from a reading taken after the pool's history has rolled past the window; either party can settle as soon as settlement opens. |
-| **D1 Default (dark)** | After the cut-off, if a settlement attempt found the meter dark, the seller is paid in full: the buyer controls the pool, and the probe showed it readable. |
-| **D2 Default (nothing)** | After the cut-off with no reading and no dark attempt, the buyer is refunded in full. |
+| **D1 Default (dark)** | After the cut-off, if a settlement attempt after the window ever found the meter dark (kept permanently as `dark_at`), the seller is paid in full: the buyer controls the pool, and the probe showed it readable. |
+| **D2 Default (nothing)** | After the cut-off with no reading and no dark attempt, the buyer is refunded in full. After the cut-off `settle` is refused, so only D1 or D2 can apply and the order of two transactions cannot choose between a reading and a default. |
 | **R1 Agreed split** | Both parties named the same seller share. |
 | **Bond** | Returned to the seller in proportion to the delivered share; the rest goes to the buyer. |
 
@@ -53,19 +53,23 @@ Money is integer arithmetic in wei. For every final state the payouts add up exa
 - `gl.vm.run_nondet_unsafe(leader_fn, validator_fn)` for the probe, outage reports and settlement.
 - A validator repeats the leader's work independently, re-validates the shape of the leader's result (a malformed or impossible result is rejected), and accepts only if:
   - both readings are the same kind (a reading, or no reading) and, for no reading, the same reason;
-  - for a reading, the **raw** delivered shares differ by at most **2 percentage points**, and by at most **half a point** where the two readings fall on different sides of the grace step.
-- Outage reports must agree on the set of qualifying intervals within one slot.
+  - for a reading, the worker is listed in both or neither, and the **rule and the paid share worked out from each copy, with the outages on record, are exactly equal**. The payout is a pure function of the share, so **every reading validators can accept pays exactly the same amounts**.
+- Outage reports must cover **exactly the same slots** of the window (the only thing a report feeds into the settlement).
+- Only what decides the money is compared. Two copies that pay the same (for example both inside the grace band) agree; copies that would pay even one basis point differently do not, and nothing moves. The rows stored with a settlement are therefore the leader's copy, bound to produce the agreed outcome; the raw share and slot counts shown beside it come from that copy.
 - "No reading" is an agreed outcome, so an unreadable page costs one round instead of a stalled transaction.
 - After consensus the contract recomputes the payout from the agreed facts.
-- **What a dishonest leader can do:** move the raw share by at most 2 points, and turn a reading into full pay only when the honest reading is already within half a point of the grace edge (with 3% grace: from 96.5%). Without the half-point rule, the 2-point tolerance plus the grace step would have let it lift a 95% reading to 100%. Honest validators copy the same finished rows, so in every live run they reported identical numbers; the tolerance only absorbs differences in rounding.
+- **What a dishonest leader can do:** nothing to the payout. It cannot move the share by any amount, because validators accept only the share they compute themselves. It can only cause "no agreement", which moves nothing; anyone may retry until the default cut-off (D1/D2).
+- **Changed in v3.** v2 accepted raw shares up to 2 points apart (half a point at the grace edge) and paid by the leader's number. A GenLayer steward rejected the same pattern in our MeterReader contract: two readings validators would both accept could pay differently. v3 binds the payout exactly, outage reports by covered slots, converts numbers with integer arithmetic only (floats turned 8.014 PH/s into 1 H/s less than a contracted 8.014 PH/s), and keeps the first dark reading after the window permanently for rule D1 (v2 looked only at the last 20 attempts). All 11 live cases still settle with the stricter agreement (below).
 
 ## Safety details
 
 - **Payable calls never revert after money arrives.** On GenLayer Studio a reverted payable call keeps the GEN it was sent (measured: 3 GEN stayed in the contract balance with no record). So `create` and `accept` check everything first and, on any problem, send the value straight back and return the reason.
-- Page text sits between delimiters that the page cannot reproduce; the model is told the page is untrusted data; it can only fill a fixed form; Python decides. A fooled leader cannot move the payout beyond the tolerance above, because honest validators copying the real numbers reject it (tested).
+- Page text sits between delimiters that the page cannot reproduce; the model is told the page is untrusted data; it can only fill a fixed form; Python decides. A fooled leader cannot move the payout at all, because honest validators copying the real numbers reject any share they would not pay themselves (tested).
 - **URL filter.** Refused: user names or passwords in the address, backslashes, IPv6 literals, single-label hosts (`metadata`, `localhost`), numeric tricks (`2130706433`, `0x7f.0.0.1`, `0177.0.0.1`), private, loopback, link-local (cloud metadata), shared and reserved IPv4 ranges, and `.local`, `.internal`, `.lan` and similar names. A public name that resolves to a private address cannot be seen from a contract; GenVM's network sandbox is the boundary there. A refused address at `create` sends the price straight back (shown live).
 - Each agreement's history keeps its first entry and the latest 99, so repeated probes or retries cannot grow the record without limit.
-- Outage reports must start with the status-site prefix frozen in the terms (`https://…/`).
+- Outage reports must start with the status-site prefix frozen in the terms (`https://…/`), and can be filed only after the window ends, so a report cannot be used up early.
+- **Timing, stated plainly.** Settlement opens one slot after the window ends and, unless both parties have added or waived an outage report, once the evidence window (`evidence_minutes`, fixed in the terms) has passed. Either party may settle from then until the cut-off, so either can have the page read promptly. The seller sees `evidence_minutes` before accepting; it should be shorter than the time the pool keeps the window on the worker page, or a reading may come too late (fewer than half the slots: C1, then the default). A dark page found by any settle attempt after the window arms D1 for good, because a dark meter is on the buyer's side.
+- **What is stored.** The listed flag, the rule and the share are agreed by the validators from their own copies and decide the payout. The rows, raw share and slot counts stored beside them are the leader's copy, bound to produce that outcome; so are the outage intervals of a report, for which validators agree on the slots covered. `get_rules`, each settlement record and the site say so.
 - The contract tracks `locked` (GEN owed to open agreements); tests assert it returns to zero.
 - Send GEN only through `create` and `accept`. The contract has no method for plain transfers.
 
@@ -87,11 +91,37 @@ Demo rentals use five 1-minute slots so a full lifecycle takes about 15 minutes;
 
 ## Also on Testnet Bradbury Phase 2, with real payouts
 
-The same contract (GenVM v0.6 build; the same 163 tests pass on both runtimes) is live on Bradbury Phase 2 at [`0xD3c8…fcd8`](https://scan.bradbury.genlayer.com/address/0xD3c85288A22FC33961eD80CcE54F7b90A0Aafcd8). Five cases went through the full flow there, each step decided by 5 validators: steady rig 100%, rig at about 60% paid 60.82%, a pool outage excused by the status page 100%, a seller who never showed 0%, and an agreed 75% split. After the settlements finalized, the seller's balance rose by exactly the sum of its payouts. Details and transaction links: [`bradbury/README.md`](bradbury/README.md).
+The same v3 contract (GenVM v0.6 build; the same 213 tests pass on both runtimes) is live on Bradbury Phase 2 at [`0xa91E…12B4`](https://scan.bradbury.genlayer.com/address/0xa91Ee5FEe48852620E6deC87159f04Edb40312B4). Five cases went through the full flow there, each step agreed by 5 of 5 validators: steady rig 100%, rig at about 60% paid 60.06%, a pool outage excused by the status page 100%, a seller who never showed 0%, and an agreed 75% split. After the settlements finalized, the seller's balance rose by exactly the sum of its payouts (7.8018 GEN). Details and transaction links: [`bradbury/README.md`](bradbury/README.md).
 
 The website shows this record too: switch to **Bradbury testnet** at the top of the page, or open [rigsettle.brilliantnodes.com/?net=bradbury](https://rigsettle.brilliantnodes.com/?net=bradbury). It is read-only there (no wallet needed); each rental lists every step with a link to the Bradbury explorer. Trying the steps yourself stays on Studio, which has free temporary accounts.
 
-## Live results on Studio (v2)
+## Live results on Studio (v3)
+
+Contract `0x918635F13907c1C0C8CED56d0f14e2bc9b516DC3`, 16 November 2026. Every rental used the fictional demo pools, five 1-minute slots, a 10 GEN price and a 2 GEN bond. The table is printed from the chain by `tools/results_table.py`; only the "Run through" column is written by hand.
+
+| # | Case | Run through | Measured | Paid share | Rule | Buyer / seller GEN |
+|---|---|---|---|---|---|---|
+| #1 | Steady rig | command line | 99.72% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #2 | Rig delivering about 60% | command line | 60.26% | 60.26% | `S2_PRO_RATA` | 4.7688 / 7.2312 |
+| #3 | Pool outage, with outage report | command line | 100.00% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #4 | Pool outage, no report | command line | 60.00% | 60.00% | `S2_PRO_RATA` | 4.8 / 7.2 |
+| #5 | Seller never shows | command line | 0.00% | 0.00% | `Z1_WORKER_NOT_LISTED` | 12 / 0 |
+| #6 | Rig idles 2 of 5 minutes, pool hides them | command line | 59.82% | 59.82% | `S2_PRO_RATA` | 4.8216 / 7.1784 |
+| #7 | Buyer cancels before acceptance | command line | – | – | `CANCELLED_BY_BUYER` | 10 / 0 |
+| #8 | Never accepted: expired | command line | – | – | `EXPIRED_UNACCEPTED` | 10 / 0 |
+| #9 | Pool page goes dark | command line (meant as the dark-page case; Studio queued its settle until the page was back up, so it settled from a normal reading) | 99.86% | 100.00% | `G1_WITHIN_GRACE` | 0 / 12 |
+| #10 | Both parties agree a split | command line | – | 75.00% | `R1_AGREED_SPLIT` | 3 / 9 |
+| #11 | Buyer cancels before acceptance | command line (a create with a cloud-metadata URL and an accept with the wrong bond were both refused and refunded first) | – | – | `CANCELLED_BY_BUYER` | 10 / 0 |
+| #12 | Pool page goes dark | command line (dark-page case rerun on its own) | – | 100.00% | `D1_METER_DARK_AFTER_WINDOW` | 0 / 12 |
+
+What the runs show:
+
+- **Exact agreement settles in practice.** Every reading-based case reached agreement with v3's rule (validators must reach the same rule and share from their own copies): steady 100%, about 60% paid 60.26%, idle minutes hidden 59.82%, outage with report 100% and without 60.00%, no-show 0%.
+- **The safe paths still work.** A dark page gave "no reading"; after the cut-off the default rule paid the seller (#12). #9 shows why the cut-off rule matters: it was meant to read the dark page, but Studio's queue delayed the transaction until the page was back, so it settled from a real reading. Refused requests were refunded (#11), an unaccepted rental expired (#8), cancels refunded the price, and the agreed split paid 75% (#10).
+- **Money is exact.** For every closed agreement the payouts add up to exactly what was locked, and `get_locked()` is 0.
+
+<details>
+<summary>v2 results (14 Nov 2026, the earlier contract with a 2-point tolerance; superseded)</summary>
 
 Contract `0x8A3E961A3f8C0596F4AFf47B664dfE35A408429f`, 14 November 2026. Every rental used the fictional demo pools, five 1-minute slots, a 10 GEN price and a 2 GEN bond. The table is printed from the chain by `tools/results_table.py`; only the "Run through" column is written by hand.
 
@@ -152,10 +182,12 @@ What the runs show:
 - **Money is exact.** For every closed agreement the payouts add up to exactly what was locked (the price, plus the bond once accepted), and `get_locked()` equals what the one open ready rental holds (12 GEN).
 - Studio's gateway sometimes answers 502 for a few seconds, and once cancelled a settlement transaction outright (nothing moved; the retry settled). The command-line tools retry; the site explains both outcomes and lets the visitor try again.
 
+</details>
+
 ## Tests
 
-- `PYTHONPATH=. pytest tests/direct` runs **163 direct-mode tests** (web and LLM mocked): every rule ID, every refusal path with its refund, timing gates, outage evidence, the default rules, agreed release, money invariants, validator accept/reject cases (drift, gaps, the grace edge, lying, sneaky and malformed leaders), the URL filter, number parsing, prompt delimiters, views, history capping and picklability of the non-deterministic closures.
-- **Mutation check:** `PYTHONPATH=. python tools/mutate.py` breaks the contract in 46 ways (each rule, gate, refund, tolerance and filter) and runs the tests against each broken copy; all 46 are caught. The original file is never modified.
+- `PYTHONPATH=. pytest tests/direct` runs **213 direct-mode tests** (web and LLM mocked): every rule ID, every refusal path with its refund, timing gates, outage evidence, the default rules (including a dark reading followed by 21 failed attempts, settle refused after the cut-off, and a cut-off that always leaves time to settle), agreed release, money invariants, validator accept/reject cases (a tenth of a point of drift refused, the grace edge, the outages on record applied by the validator, lying, sneaky and malformed leaders), exact number conversion, the URL filter, prompt delimiters, views, history capping and picklability of the non-deterministic closures.
+- **Mutation check:** `PYTHONPATH=. python tools/mutate.py` breaks the contract in 63 ways (each rule, gate, refund, agreement check and filter; among them v2's 2-point tolerance put back, a validator that ignores the outages on record, and float conversion) and runs the tests against each broken copy; all 63 are caught. The original file is never modified.
 - `genvm-lint check contracts/rigsettle.py` passes.
 - `tests/direct/conftest.py` patches one gap in `genlayer-test` 0.29.2: its `warp()` does not update `gl.message_raw["datetime"]`, so without the patch time-based rules could not be tested.
 - `tests/e2e/site_flow.py` drives the live site with Playwright, playing both parties from create to settlement (see Site).

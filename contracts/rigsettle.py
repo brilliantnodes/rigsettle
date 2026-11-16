@@ -12,16 +12,37 @@ neither party can write to.
   4. After the window, anyone asks for settlement. Every validator reads the
      pool page and COPIES the per-slot accepted hashrate into a fixed form.
      Plain Python, never the model, turns those numbers into the delivered
-     share, and validators must agree on it within 2 percentage points
-     (within half a point where the grace rule would decide differently).
+     share. Each validator works out the outcome from its own copy (rule and
+     share, and so the payouts) and accepts the leader's reading only if it
+     is EXACTLY the same. Every accepted reading therefore splits the escrow
+     the same way; copies that pay differently give no agreement, nothing
+     moves, and anyone may retry until the default cut-off. After the
+     cut-off only the default rules apply (D1/D2): settle is refused, so the
+     order of two transactions cannot choose between a reading and a default.
      A slot the page does not list earns nothing.
   5. The seller is paid the delivered share of the price and gets the same
      share of the bond back. The buyer gets the rest. Payouts are messages
      that run when the settlement transaction is finalized.
 
 Either party may add one outage report from the status site named in the
-terms. An outage excuses the seller only for slots where the meter itself
-shows the drop. A page that cannot be read moves nothing.
+terms, after the window ends. An outage excuses the seller only for slots
+where the meter itself shows the drop. A page that cannot be read moves
+nothing.
+
+Timing, stated plainly. Settlement opens one slot after the window ends and,
+unless both parties have added or waived an outage report, only once the
+evidence window (evidence_minutes, fixed in the terms) has passed. Either
+party may settle from then until the default cut-off, so either can have it
+read promptly. The seller sees evidence_minutes before accepting; it should
+be shorter than the time the pool keeps the window on the worker page.
+A dark page found by any settle attempt after the window arms rule D1 for
+good: the buyer controls the pool, so a dark meter is the buyer's side.
+
+What is stored: the worker-listed flag, the rule and the share are what
+validators agreed from their own copies, and decide the payout. The rows,
+raw share and slot counts stored beside them are the leader's copy, bound to
+produce that outcome. The same holds for outage reports: validators agree
+which slots a report covers; the stored intervals are the leader's copy.
 
 Payable methods never revert after money arrives: on a bad request they
 send the value straight back and report the error, because a reverted
@@ -36,9 +57,8 @@ from genlayer import *
 # ----------------------------------------------------------------- rules
 
 BP = 10000
-SHARE_TOLERANCE_BP = 200  # validators may differ by 2 points on the raw share
-GRACE_EDGE_TOLERANCE_BP = 50  # ...but only half a point if grace would decide differently
 MIN_COVERAGE_BP = 5000  # at least half the slots must be on the page
+AGREED_NOTE = "validators agreed listed, rule and share from their own copies; the rows, raw share and slot counts are the leader's copy, and so are outage intervals (validators agreed which slots they cover)"
 MAX_HISTORY = 100  # history entries kept per agreement (first one always kept)
 PROBE_FRESH_SECS = 60 * 60  # accept needs a passing probe this recent
 SLOT_CHOICES = (1, 5, 10, 15, 30, 60)
@@ -155,46 +175,86 @@ def _parse_minute(text) -> int | None:
     return int(d.timestamp())
 
 
-def _parse_number(s: str) -> float | None:
-    """'6.28', '1,234.5' or '12,345' to a float. A comma that is not a
-    thousands separator ('6,28') is ambiguous and refused."""
+DIGITS = "0123456789"
+
+
+def _exact(s: str) -> tuple | None:
+    """A plain decimal ('6.28', '.5', '1.5e3') to (digits, scale) meaning
+    digits / 10**scale, exactly. No floats: binary floating point turns some
+    figures (0.009 EH/s, 8.014 PH/s) one hash per second too low, which can
+    cost a slot its full credit at the contracted rate."""
+    s = s.strip().lower()
+    if len(s) > 60:
+        return None
+    exp = 0
+    if "e" in s:
+        s, e = s.split("e", 1)
+        sign = -1 if e.startswith("-") else 1
+        e = e[1:] if e[:1] in ("+", "-") else e
+        if e == "" or len(e) > 3 or any(c not in DIGITS for c in e):
+            return None
+        exp = sign * int(e)
+    whole, _, frac = s.partition(".")
+    if "." in frac or (whole == "" and frac == ""):
+        return None
+    if any(c not in DIGITS for c in whole + frac):
+        return None
+    num = int((whole or "0") + frac)
+    scale = len(frac) - exp
+    if scale < 0:
+        num, scale = num * 10 ** (-scale), 0
+    if scale > 60:
+        return None
+    return num, scale
+
+
+def _parse_number(s: str) -> tuple | None:
+    """'6.28', '1,234.5' or '12,345' to an exact (digits, scale). A comma
+    that is not a thousands separator ('6,28', '1.234,5') is ambiguous and
+    refused."""
     s = s.strip()
     if s == "":
         return None
     if "," in s:
-        groups = s.split(".", 1)[0].split(",")
-        if not (groups[0].isdigit() and 1 <= len(groups[0]) <= 3 and all(g.isdigit() and len(g) == 3 for g in groups[1:])):
+        whole, _, frac = s.partition(".")
+        groups = whole.split(",")
+        if "," in frac or not (groups[0] != "" and all(c in DIGITS for c in groups[0]) and len(groups[0]) <= 3 and all(len(g) == 3 and all(c in DIGITS for c in g) for g in groups[1:])):
             return None
         s = s.replace(",", "")
-    try:
-        return float(s)
-    except ValueError:
-        return None
+    return _exact(s)
 
 
 def _parse_rate_hs(value, unit) -> int | None:
-    """A copied number and unit to whole hashes per second, or None.
-    Accepts a JSON number, or text such as '6.28' or '6.28 GH/s'."""
+    """A copied number and unit to whole hashes per second (rounded down,
+    integer arithmetic only), or None. Accepts a JSON number, or text such
+    as '6.28' or '6.28 GH/s'. A JSON number arrives as a float; repr gives
+    back the shortest decimal that is that float, the digits the model wrote."""
     if value is None or isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        v = float(value)
+    if isinstance(value, int):
+        v = _exact(str(value)) if value >= 0 else None
+        rest = ""
+    elif isinstance(value, float):
+        v = _exact(repr(value)) if value == value and value >= 0 else None
         rest = ""
     else:
         s = str(value).strip()
         j = 0
-        while j < len(s) and (s[j].isdigit() or s[j] in ".,"):
+        while j < len(s) and (s[j] in DIGITS or s[j] in ".,"):
             j += 1
         v = _parse_number(s[:j])
         rest = s[j:].strip()
-        if v is None:
-            return None
-    if v != v or v < 0 or v > 1e24:
+    if v is None:
+        return None
+    num, scale = v
+    if num > 10**24 * 10**scale:
         return None
     given = str(unit or "").strip()
     if given and rest and given.lower().replace(" ", "") != rest.lower().replace(" ", ""):
         return None  # the value and the unit field disagree
     u = (given or rest).lower().replace(" ", "")
+    if num == 0 and u == "":
+        return 0  # a row shown as "-" or "offline" is copied as a bare 0
     if u.endswith("/s"):
         u = u[:-2]
     elif u.endswith("ps"):
@@ -204,7 +264,7 @@ def _parse_rate_hs(value, unit) -> int | None:
     mult = UNITS.get(u)
     if mult is None:
         return None
-    return int(round(v * mult))
+    return num * mult // 10**scale
 
 
 def _parse_llm_json(raw) -> dict:
@@ -313,6 +373,8 @@ def _check_reading(r, slots: int) -> dict:
         out.append([i, v])
     if not r["listed"] and out:
         raise ValueError("unlisted worker with rows")
+    if r["listed"] and len(out) * BP < MIN_COVERAGE_BP * slots:
+        raise ValueError("coverage below the minimum")
     return {"kind": "READ", "listed": r["listed"], "rows": out}
 
 
@@ -332,13 +394,12 @@ def _share(t: dict, reading: dict, outages: list) -> dict:
     if not reading["listed"]:
         return {"raw_share_bp": 0, "share_bp": 0, "metered_slots": 0, "missing_slots": slots, "excused_slots": 0, "rule": "Z1_WORKER_NOT_LISTED"}
     measured_by_slot = {i: v for i, v in reading["rows"]}
+    down_slots = set(_down_slots(t, outages))
     delivered = 0
     excused = 0
     for i in range(slots):
         measured = measured_by_slot.get(i, 0)
-        s0 = start + i * slot
-        down = any(a < s0 + slot and b > s0 for a, b in outages)
-        if down and measured < rate:
+        if i in down_slots and measured < rate:
             delivered += rate
             excused += 1
         else:
@@ -349,6 +410,15 @@ def _share(t: dict, reading: dict, outages: list) -> dict:
     if raw >= BP - t["grace_bp"]:
         return {**base, "share_bp": BP, "rule": "G1_WITHIN_GRACE"}
     return {**base, "share_bp": raw, "rule": "S2_PRO_RATA"}
+
+
+def _down_slots(t: dict, outages: list) -> list:
+    """The window's slots that a counted outage overlaps. This is the only
+    thing the outage reports feed into the settlement, so it is also what
+    validators must agree on when an outage report is added."""
+    start, _ = _window(t)
+    slot = t["slot_minutes"] * 60
+    return [i for i in range(t["slots"]) if any(a < start + (i + 1) * slot and b > start + i * slot for a, b in outages)]
 
 
 def _payout(price: int, bond: int, share_bp: int) -> dict:
@@ -405,13 +475,12 @@ def _check_evidence(r) -> dict:
 
 
 def _same_evidence(t: dict, a: dict, b: dict) -> bool:
-    if a["kind"] != b["kind"] or len(a["intervals"]) != len(b["intervals"]):
+    """Same kind, and EXACTLY the same window slots covered by an outage.
+    The covered slots are all the settlement uses, so two accepted copies of
+    a status page can never excuse different slots."""
+    if a["kind"] != b["kind"]:
         return False
-    tol = t["slot_minutes"] * 60
-    for x, y in zip(a["intervals"], b["intervals"]):
-        if abs(x[0] - y[0]) > tol or abs(x[1] - y[1]) > tol:
-            return False
-    return True
+    return _down_slots(t, a["intervals"]) == _down_slots(t, b["intervals"])
 
 
 # ------------------------------------------------------------- prompts
@@ -499,6 +568,18 @@ def _read_evidence(t: dict, url: str) -> dict:
 
 
 def _same_reading(t: dict, outages: list, a: dict, b: dict) -> bool:
+    """What validators must agree on before any money moves: the same kind
+    (and reason), and for a reading EXACTLY the same outcome worked out from
+    each copy with the outages on record: whether the worker is listed, the
+    rule and the share. The payout is a pure function of the share, so every
+    accepted reading pays exactly the same amounts.
+
+    Only what decides the money is compared, so copies that pay the same
+    (for example two readings both inside the grace band) still agree; a
+    stricter check would only make "no agreement" likelier. The rows stored
+    with a settlement are therefore the leader's copy, bound to produce this
+    outcome: figures shown beside it (the raw share, metered, missing and
+    excused slots) come from that copy."""
     if a["kind"] != b["kind"]:
         return False
     if a["kind"] == "NO_READING":
@@ -506,15 +587,7 @@ def _same_reading(t: dict, outages: list, a: dict, b: dict) -> bool:
     if a["listed"] != b["listed"]:
         return False
     sa, sb = _share(t, a, outages), _share(t, b, outages)
-    gap = abs(sa["raw_share_bp"] - sb["raw_share_bp"])
-    if gap > SHARE_TOLERANCE_BP:
-        return False
-    # The grace rule is a step. Where the two readings fall on different
-    # sides of it, a 2-point gap would let a leader lift a 95% reading to
-    # full pay, so the readings must then be within half a point.
-    if sa["rule"] != sb["rule"] and gap > GRACE_EDGE_TOLERANCE_BP:
-        return False
-    return True
+    return (sa["rule"], sa["share_bp"]) == (sb["rule"], sb["share_bp"])
 
 
 # ------------------------------------------------------------- storage
@@ -531,7 +604,8 @@ class Agreement:
     created_at: u256
     probe_json: str  # last probe: {"ok", "at", "reason"}
     evidence_json: str  # {"buyer": record|None, "seller": record|None}
-    attempts_json: str  # settlement attempts that produced no reading
+    attempts_json: str  # settlement attempts that produced no reading (last 20)
+    dark_at: u256  # first time the meter was read dark after the window (0 = never); kept for rule D1
     release_json: str  # {"buyer": bp|None, "seller": bp|None}
     result_json: str  # final reading, share and payout
     history_json: str
@@ -549,6 +623,7 @@ def _record(a: Agreement) -> dict:
         "probe": json.loads(a.probe_json),
         "evidence": json.loads(a.evidence_json),
         "attempts": json.loads(a.attempts_json),
+        "dark_at": int(a.dark_at),
         "release": json.loads(a.release_json),
         "result": json.loads(a.result_json),
         "history": json.loads(a.history_json),
@@ -674,7 +749,9 @@ class RigSettle(gl.Contract):
             return "grace_bp must be 0 to 1000"
         if not (0 <= t["evidence_minutes"] <= MAX_EVIDENCE_MINUTES):
             return "evidence_minutes must be 0 to 1440"
-        lo = t["evidence_minutes"] + MIN_DEFAULT_GAP_MINUTES
+        # Settlement opens one slot after the window (later if the evidence
+        # window is longer), so the cut-off must leave time after that.
+        lo = max(t["evidence_minutes"], t["slot_minutes"]) + MIN_DEFAULT_GAP_MINUTES
         if not (lo <= t["default_after_minutes"] <= MAX_DEFAULT_MINUTES):
             return f"default_after_minutes must be {lo} to {MAX_DEFAULT_MINUTES}"
         return ""
@@ -733,6 +810,7 @@ class RigSettle(gl.Contract):
             probe_json=json.dumps(None),
             evidence_json=json.dumps({"buyer": None, "seller": None}),
             attempts_json="[]",
+            dark_at=u256(0),
             release_json=json.dumps({"buyer": None, "seller": None}),
             result_json=json.dumps(None),
             history_json="[]",
@@ -854,6 +932,8 @@ class RigSettle(gl.Contract):
         party = self._party(a)
         t = json.loads(a.terms_json)
         _, end = _window(t)
+        if self._now() < end:
+            raise gl.vm.UserError("outage reports open when the window ends")
         if self._now() >= end + t["evidence_minutes"] * 60:
             raise gl.vm.UserError("the evidence window has closed")
         ev = json.loads(a.evidence_json)
@@ -935,6 +1015,8 @@ class RigSettle(gl.Contract):
         now = self._now()
         if not self._settle_open(a, t, now):
             raise gl.vm.UserError("settlement opens one slot after the window ends and after the evidence window, unless both parties have added or waived evidence")
+        if now >= _window(t)[1] + t["default_after_minutes"] * 60:
+            raise gl.vm.UserError("the default cut-off has passed: only settle_default applies now")
         ev = json.loads(a.evidence_json)
         outages = []
         for party in ("buyer", "seller"):
@@ -958,11 +1040,15 @@ class RigSettle(gl.Contract):
             att = json.loads(a.attempts_json)
             att.append({"at": now, "reason": reading["reason"]})
             a.attempts_json = json.dumps(att[-20:])
+            # Rule D1 must not depend on the trimmed list above: once the
+            # meter has been read dark after the window, that stays on record.
+            if reading["reason"] == "N1_METER_DARK" and int(a.dark_at) == 0 and now >= _window(t)[1]:
+                a.dark_at = u256(now)
             self._log(a, "settle_no_reading", reading["reason"])
             return {"settled": False, "reason": reading["reason"]}
         s = _share(t, reading, outages)
         self._log(a, "settle", f"{s['rule']} share {s['share_bp']} bp")
-        self._pay_share(a, "SETTLED", s["share_bp"], {**s, "reading": reading, "outages": outages})
+        self._pay_share(a, "SETTLED", s["share_bp"], {**s, "reading": reading, "outages": outages, "agreed": AGREED_NOTE})
         return {"settled": True, "share_bp": s["share_bp"], "rule": s["rule"]}
 
     @gl.public.write
@@ -978,9 +1064,7 @@ class RigSettle(gl.Contract):
         now = self._now()
         if now < end + t["default_after_minutes"] * 60:
             raise gl.vm.UserError("the default cut-off has not passed")
-        att = json.loads(a.attempts_json)
-        dark = any(x["reason"] == "N1_METER_DARK" and x["at"] >= end for x in att)
-        if dark:
+        if int(a.dark_at) > 0:
             self._log(a, "settle_default", "D1")
             self._pay_share(a, "SETTLED", BP, {"rule": "D1_METER_DARK_AFTER_WINDOW"})
             return {"share_bp": BP, "rule": "D1_METER_DARK_AFTER_WINDOW"}
@@ -1019,8 +1103,10 @@ class RigSettle(gl.Contract):
     @gl.public.view
     def get_rules(self) -> dict:
         return {
-            "share_tolerance_bp": SHARE_TOLERANCE_BP,
-            "grace_edge_tolerance_bp": GRACE_EDGE_TOLERANCE_BP,
+            "agreement": "exact: validators work out rule and share from their own copy and both must equal the leader's, so every accepted reading pays the same",
+            "evidence_agreement": "exact: the same window slots covered by an outage",
+            "stored_copy": AGREED_NOTE,
+            "timing": "settle from one slot after the window (after the evidence window unless both parties added or waived a report) until the default cut-off; after it only settle_default; a dark page after the window arms D1 for good",
             "missing_slot_counts_as": 0,
             "min_coverage_bp": MIN_COVERAGE_BP,
             "probe_fresh_minutes": PROBE_FRESH_SECS // 60,

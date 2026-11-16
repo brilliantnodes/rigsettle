@@ -602,15 +602,16 @@ function renderAgreementBody(a) {
     if (now < T.start) nx.textContent = `Accepted. The mining window starts at ${utc(T.start)} (${inWords(T.start - now)}). Point the rigs at the pool with worker name "${t.worker_name}".`;
     else if (now < T.end) nx.textContent = `The mining window is running until ${utc(T.end)} (${inWords(T.end - now)}).`;
     else if (now < T.settleAt) nx.textContent = `The window has ended. Settlement opens at ${utc(T.settleAt)} (${inWords(T.settleAt - now)}). Until ${utc(T.evidenceUntil)} each party may add one outage report or waive it.`;
-    else nx.textContent = `Settlement is open. Anyone can ask the validators to read the pool page${now >= T.cutoff ? ", or apply the default rule because the cut-off has passed" : ""}.`;
-    if (now >= T.settleAt && anyone) btn("Settle: validators read the pool", () => send(anyone, "settle", [a.id], 0n, "Validators read the pool page and settle").then(after));
+    else if (now < T.cutoff) nx.textContent = `Settlement is open until the default cut-off at ${utc(T.cutoff)}. Anyone can ask the validators to read the pool page.`;
+    else nx.textContent = "The default cut-off has passed, so only the default rule applies now: the seller is paid if a settle attempt found the pool page dark after the window, otherwise the buyer is refunded.";
+    if (now >= T.settleAt && now < T.cutoff && anyone) btn("Settle: validators read the pool", () => send(anyone, "settle", [a.id], 0n, "Validators read the pool page and settle").then(after));
     if (now >= T.cutoff && anyone) btn("Apply the default rule", () => send(anyone, "settle_default", [a.id], 0n, "Default rule after the cut-off").then(after), "secondary");
     // outage evidence, one per party
     const ev = a.evidence || {};
     for (const party of ["buyer", "seller"]) {
-      // Each party gets one report, so offer it once the window has ended and
-      // incidents in it can be resolved (from the start if there is no evidence window).
-      const evidenceFrom = t.evidence_minutes > 0 ? T.end : T.start;
+      // Each party gets one report, offered from the end of the window until
+      // the evidence window closes (the contract refuses reports outside it).
+      const evidenceFrom = T.end;
       if (!me[party] || ev[party] || now < evidenceFrom || now >= T.evidenceUntil || !t.status_prefix) continue;
       const wrap = el("div", "actions");
       const inp = el("input", "url");
@@ -725,7 +726,7 @@ function resultView(a) {
     }
     const d = el("details");
     d.dataset.key = "copied";
-    d.append(el("summary", null, `What the validators copied from the pool (${rd.rows.length} of ${t.slots} slots listed)`));
+    d.append(el("summary", null, `The leader's copy of the pool rows, which produced the agreed outcome (${rd.rows.length} of ${t.slots} slots listed)`));
     d.append(tbl);
     wrap.append(d);
   }
@@ -909,7 +910,9 @@ async function loadRules() {
       ["Z1 No-show", "A readable pool page that says the worker does not exist means nothing was delivered."],
       ["N1 / N2 / C1 No reading", `An unreadable page, a row that cannot be read or does not fit the terms, or fewer than ${r.min_coverage_bp / 100}% of slots on the page: nothing moves, and anyone may retry.`],
       ["D1 / D2 Default", "After the cut-off: if the page was dark, the seller is paid (the buyer controls the pool); if nobody produced a reading, the buyer is refunded."],
-      ["Validator agreement", `Same outcome kind and reason, and raw shares within ${r.share_tolerance_bp / 100} percentage points; within ${r.grace_edge_tolerance_bp / 100} of a point where the grace rule would decide differently.`],
+      ["Validator agreement", r.agreement
+        ? "Exact on what decides the money. Each validator works out, from its own copy of the pool page and the outage reports on record, whether the worker is listed, the rule and the share, and accepts the leader's only if all three are identical, so every accepted reading pays the same amounts. An outage report must cover exactly the same slots. The rows, raw share and slot counts shown with a settlement, and the intervals of an outage report, are the leader's copy. Copies that would pay differently settle nothing; anyone may retry until the cut-off."
+        : `Same outcome kind and reason, and raw shares within ${r.share_tolerance_bp / 100} percentage points; within ${r.grace_edge_tolerance_bp / 100} of a point where the grace rule would decide differently.`],
       ["Seller's bond", "Returned in proportion to the delivered share; the rest goes to the buyer."],
     ];
     const t = $("rules");

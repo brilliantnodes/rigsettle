@@ -50,14 +50,13 @@ def tidy(c):
             if a["state"] == "OPEN" and now > a["terms"]["accept_by"]:
                 tx, r = write(c, ADDR, "expire", [aid])
                 print(f"#{aid} expired: {r['status']}")
-            elif a["state"] == "ACTIVE" and (now >= cutoff or now >= opens + STALE_AFTER):
-                # A real reading first; the default rule only if the page gives none.
+            elif a["state"] == "ACTIVE" and now >= cutoff:
+                # After the cut-off the contract allows only the default rule.
+                tx, r = write(c, ADDR, "settle_default", [aid])
+                print(f"#{aid} default rule: {r['status']} {r['result']}")
+            elif a["state"] == "ACTIVE" and now >= opens + STALE_AFTER:
                 tx, r = write(c, ADDR, "settle", [aid])
                 print(f"#{aid} settled by the hourly job: {r['status']} {r['result']}")
-                res = r["result"] if isinstance(r["result"], dict) else {}
-                if not res.get("settled") and now >= cutoff:
-                    tx, r = write(c, ADDR, "settle_default", [aid])
-                    print(f"#{aid} default rule: {r['status']} {r['result']}")
         except Exception as e:  # one stuck agreement must not stop the rest
             print(f"#{aid} not tidied: {str(e)[:200]}")
 

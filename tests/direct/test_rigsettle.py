@@ -509,6 +509,78 @@ def test_dark_meter_records_attempt_then_default_pays_seller(env):
     assert_paid(env, 0, 12 * G)
 
 
+def test_dark_reading_is_kept_for_d1_after_many_later_attempts(env):
+    """Found in review: D1 searched only the last 20 attempts, so 20 later
+    coverage failures could turn "seller paid" into "buyer refunded"."""
+    active(env)
+    assert settle(env, meter_answer([], kind="unavailable"))["reason"] == "N1_METER_DARK"
+    assert settle(env, meter_answer([], kind="unavailable"), at=END + 3 * 60 + 30)["reason"] == "N1_METER_DARK"
+    assert env.c.get_agreement("1")["dark_at"] == END + 3 * 60  # the first dark reading is kept
+    for k in range(21):
+        assert settle(env, meter_answer([10.0, 10.0, None, None, None]), at=END + 4 * 60 + k)["reason"] == "C1_COVERAGE"
+    a = env.c.get_agreement("1")
+    assert len(a["attempts"]) == 20 and all(x["reason"] == "C1_COVERAGE" for x in a["attempts"]) and a["dark_at"] == END + 3 * 60
+    env.vm.warp(iso(END + 20 * 60))
+    env.vm.sender = env.charlie
+    assert env.c.settle_default("1")["rule"] == "D1_METER_DARK_AFTER_WINDOW"
+    assert_paid(env, 0, 12 * G)
+
+
+@pytest.mark.parametrize("slot,evidence,ok", [(60, 0, False), (60, 0, True), (15, 0, False), (1, 0, True), (5, 30, True), (5, 30, False)])
+def test_cut_off_leaves_time_to_settle(env, slot, evidence, ok):
+    """Found in the third review: with 60-minute slots, no evidence window
+    and a 10-minute cut-off, settlement never opened before the cut-off, so
+    the default refunded the buyer the price and the seller's whole bond."""
+    gap = max(evidence, slot) + 10
+    out = create(env, slot_minutes=slot, slots=3, start_at=T0 + 3600, accept_by=T0 + 3600, evidence_minutes=evidence, default_after_minutes=gap if ok else gap - 1)
+    if ok:
+        assert out["ok"] is True, out
+    else:
+        assert out["ok"] is False and "default_after_minutes must be" in out["error"], out
+
+
+def test_settle_is_refused_after_the_default_cut_off(env):
+    """Found in review: after the cut-off both settle and settle_default
+    could run, so transaction order chose between a reading and a default."""
+    active(env)
+    assert settle(env, meter_answer([], kind="unavailable"))["reason"] == "N1_METER_DARK"
+    with env.vm.expect_revert("default cut-off has passed"):
+        settle(env, meter_answer([5.0] * 5), at=END + 20 * 60)
+    env.vm.sender = env.charlie
+    assert env.c.settle_default("1")["rule"] == "D1_METER_DARK_AFTER_WINDOW"
+
+
+def test_settle_still_works_just_before_the_cut_off(env):
+    active(env)
+    out = settle(env, meter_answer([6.0] * 5), at=END + 20 * 60 - 1)
+    assert out["settled"] is True and out["share_bp"] == 6000
+
+
+def test_a_bare_zero_row_counts_as_zero(env):
+    """Found in review: an offline row copied as a bare 0 with no unit made
+    the whole reading a format error, every retry too, so the seller lost
+    everything by default."""
+    active(env)
+    rows = [{"slot_start_utc": hm(START + 60 * i), "accepted_rate": v, "unit": u} for i, (v, u) in enumerate([(6.0, "GH/s"), (0, ""), (6.0, "GH/s"), (6.0, "GH/s"), (6.0, "GH/s")])]
+    out = settle(env, meter_answer([], extra=rows))
+    assert out == {"settled": True, "share_bp": 4800, "rule": "S2_PRO_RATA"}
+
+
+def test_outage_report_waits_for_the_window_to_end(env):
+    active(env)
+    with env.vm.expect_revert("outage reports open when the window ends"):
+        evidence(env, [INCIDENT], at=END - 1)
+    assert evidence(env, [INCIDENT], at=END)["ok"] is True
+
+
+def test_records_say_what_was_agreed(env):
+    active(env)
+    settle(env, meter_answer([6.0] * 5))
+    assert env.c.get_agreement("1")["result"]["agreed"].startswith("validators agreed listed, rule and share")
+    r = env.c.get_rules()
+    assert r["stored_copy"].startswith("validators agreed") and "settle_default" in r["timing"]
+
+
 def test_aged_out_data_then_default_refunds_buyer(env):
     active(env)
     out = settle(env, meter_answer([10.0, 10.0, None, None, None]))
@@ -731,13 +803,15 @@ def test_validator_agrees_on_same_data(env):
     assert env.vm.run_validator() is True
 
 
-def test_validator_tolerates_small_drift(env):
+def test_validator_refuses_small_drift_that_changes_the_settlement(env):
+    # Earlier versions tolerated this drift (2 points). The share would move
+    # money, so agreement is now exact.
     active(env)
     settle(env, meter_answer([6.0] * 5))
     env.vm.clear_mocks()
     env.vm.mock_web(METER_RE, {"status": 200, "body": "x"})
     env.vm.mock_llm(METER_PROMPT, meter_answer([6.0, 6.1, 6.0, 5.9, 6.05]))
-    assert env.vm.run_validator() is True
+    assert env.vm.run_validator() is False
 
 
 def test_validator_rejects_a_large_gap(env):
@@ -800,13 +874,39 @@ def test_evidence_validator(env):
     assert env.vm.run_validator() is True
     env.vm.clear_mocks()
     env.vm.mock_web(re.escape(STATUS), {"status": 200, "body": "x"})
-    env.vm.mock_llm(STATUS_PROMPT, status_answer([{"service": "stratum", "start_utc": hm(START + 120), "end_utc": hm(START + 360)}]))
-    assert env.vm.run_validator() is True  # one slot either way
+    env.vm.mock_llm(STATUS_PROMPT, status_answer([{"service": "stratum", "start_utc": hm(START + 180), "end_utc": hm(START + 420)}]))
+    assert env.vm.run_validator() is True  # ends later, but after the window: the same slots are covered
+    env.vm.clear_mocks()
+    env.vm.mock_web(re.escape(STATUS), {"status": 200, "body": "x"})
+    env.vm.mock_llm(STATUS_PROMPT, status_answer([{"service": "stratum", "start_utc": hm(START + 120), "end_utc": hm(START + 300)}]))
+    assert env.vm.run_validator() is False  # one more slot covered: refused (earlier versions allowed a slot either way)
     env.vm.clear_mocks()
     env.vm.mock_web(re.escape(STATUS), {"status": 200, "body": "x"})
     env.vm.mock_llm(STATUS_PROMPT, status_answer([]))
     assert env.vm.run_validator() is False
     assert env.vm.run_validator(leader_result={"kind": "READ", "intervals": [[5, 1]]}) is False
+
+
+def test_evidence_validator_compares_the_kind(env):
+    active(env)
+    evidence(env, [])  # readable status page, no qualifying outage
+    assert env.c.get_agreement("1")["evidence"]["seller"]["intervals"] == []
+    assert env.vm.run_validator(leader_result={"kind": "UNREADABLE", "intervals": []}) is False
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"kind": "READ", "listed": True, "rows": [[0, 6], [5, 6]]},
+        {"kind": "READ", "listed": False, "rows": [[0, 6]]},
+        {"kind": "READ", "listed": True, "rows": [[0, 6], [0, 6]]},
+        {"kind": "READ", "listed": True, "rows": [[-1, 6]]},
+    ],
+)
+def test_reading_shape_guard_on_its_own(mod, bad):
+    # Applied to the agreed result before it is stored, not only in the validator.
+    with pytest.raises(ValueError):
+        mod._check_reading(bad, 5)
 
 
 def test_probe_validator(env):
@@ -849,7 +949,10 @@ def test_parse_minute(mod, text, ok):
 
 @pytest.mark.parametrize(
     "value,unit,want",
-    [(10.03, "GH/s", 10030000000), ("6,000", "MH/s", 6000000000), (1.5, "TH/s", 1500000000000), (120, "kH/s", 120000),
+    [(0.009, "EH/s", 9 * 10**15), (8.014, "PH/s", 8014 * 10**12), ("1.234,5", "kH/s", None), (1e-05, "TH/s", 10**7), (1.5e3, "MH/s", 1500 * 10**6),
+     (".5", "GH/s", 5 * 10**8), ("1.2.3", "GH/s", None), (float("inf"), "GH/s", None), (-6, "GH/s", None), (2e24, "H/s", None), (1.5, "H/s", 1),
+     ("1" * 5000, "H/s", None), ("1e+-3", "GH/s", None), (".", "GH/s", None), (0, "", 0), (0.0, "", 0),
+     (10.03, "GH/s", 10030000000), ("6,000", "MH/s", 6000000000), (1.5, "TH/s", 1500000000000), (120, "kH/s", 120000),
      (7, "Sol/s", 7), (5, "H/s", 5), (5, "furlongs", None), (-1, "GH/s", None), (True, "GH/s", None), ("abc", "GH/s", None), (3, "ghs", 3 * GH),
      ("6.28 GH/s", "", 6280000000), ("6.28 GH/s", "GH/s", 6280000000), ("6.28 GH/s", "MH/s", None), ("6,28", "GH/s", None),
      ("1,234.5", "kH/s", 1234500), ("12,345", "H/s", 12345), ("1,23,456", "H/s", None), ("", "GH/s", None), (float("nan"), "GH/s", None)],
@@ -860,7 +963,7 @@ def test_parse_rate(mod, value, unit, want):
 
 def test_rules_view(env):
     r = env.c.get_rules()
-    assert r["share_tolerance_bp"] == 200 and r["min_coverage_bp"] == 5000 and r["slot_choices"] == [1, 5, 10, 15, 30, 60]
+    assert r["agreement"].startswith("exact") and r["min_coverage_bp"] == 5000 and r["slot_choices"] == [1, 5, 10, 15, 30, 60]
 
 
 def test_no_such_agreement(env):
@@ -886,23 +989,95 @@ def _validator_copies(env, rates):
     return env.vm.run_validator()
 
 
-def test_grace_edge_needs_readings_within_half_a_point(env):
-    """A leader reading 97.00% (full pay with 3% grace) is accepted by a
-    validator reading 96.80%, but not by one reading 95.50%: on different
-    sides of the grace step, readings must be within half a point."""
+def test_grace_edge_cannot_be_crossed_by_a_leader(env):
+    """A leader reading 97.00% (full pay with 3% grace) is refused by a
+    validator reading 96.80%. Earlier versions accepted copies half a point
+    apart across the grace step; agreement is now exact."""
     active(env)
     settle(env, meter_answer([9.7] * 5))
     assert env.c.get_agreement("1")["result"]["rule"] == "G1_WITHIN_GRACE"
-    assert _validator_copies(env, [9.68] * 5) is True
-    assert _validator_copies(env, [9.55] * 5) is False
-    assert _validator_copies(env, [9.5] * 5) is False
+    assert _validator_copies(env, [9.7] * 5) is True
+    assert _validator_copies(env, [9.68] * 5) is False
+    assert _validator_copies(env, [9.75] * 5) is True  # also full pay within grace: pays the same, so it agrees
 
 
-def test_two_point_tolerance_still_applies_on_the_same_side(env):
+def test_any_difference_in_the_settlement_is_refused(env):
     active(env)
     settle(env, meter_answer([6.0] * 5))
-    assert _validator_copies(env, [5.85] * 5) is True  # 1.5 points apart, both pro rata
-    assert _validator_copies(env, [5.75] * 5) is False  # 2.5 points apart
+    assert _validator_copies(env, [6.0] * 5) is True
+    assert _validator_copies(env, [5.99] * 5) is False  # a tenth of a point: used to pass within 2 points
+    assert _validator_copies(env, [6.0, 6.0, 6.0, 6.0, None]) is False
+
+
+def test_a_different_listed_slot_that_pays_the_same_agrees(env):
+    active(env)
+    settle(env, meter_answer([6.0, 6.0, 6.0, 6.0, None]))
+    assert _validator_copies(env, [6.0, 6.0, 6.0, None, 6.0]) is True
+
+
+def test_exact_conversion_keeps_full_pay_at_the_contracted_rate(env):
+    """Found in review: 8.014 PH/s converted with floats came out 1 H/s under
+    a contracted 8.014 PH/s, so with no grace the seller lost a slot's credit."""
+    active(env, rate_hs=8014 * 10**12, grace_bp=0)
+    out = settle(env, meter_answer([8.014] * 5, unit="PH/s"))
+    assert out == {"settled": True, "share_bp": 10000, "rule": "G1_WITHIN_GRACE"}
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"kind": "READ", "listed": True, "rows": [[0, 6], [1, 6]]}, {"kind": "READ", "listed": True, "rows": []}],
+)
+def test_reading_shape_guard_needs_coverage(mod, bad):
+    with pytest.raises(ValueError):
+        mod._check_reading(bad, 5)
+
+
+def test_validator_applies_the_outages_on_record(env):
+    """Found in review: no test covered the validator with an outage on
+    record. Slot 1 is down. The leader's copy misses slot 1 (excused: 100%);
+    this validator's copy misses slot 0 (not excused: 80%). Without the
+    outage both would pay 80% and agree; with it they must not."""
+    active(env)
+    evidence(env, [{"service": "stratum", "start_utc": hm(START + 60), "end_utc": hm(START + 120)}])
+    out = settle(env, meter_answer([10.0, None, 10.0, 10.0, 10.0]))
+    assert out == {"settled": True, "share_bp": 10000, "rule": "G1_WITHIN_GRACE"}
+    assert env.c.get_agreement("1")["result"]["excused_slots"] == 1
+    assert _validator_copies(env, [None, 10.0, 10.0, 10.0, 10.0]) is False
+    assert _validator_copies(env, [10.0, None, 10.0, 10.0, 10.0]) is True
+
+
+@pytest.mark.parametrize(
+    "interval,want",
+    [((180, 300), [3, 4]), ((179, 300), [2, 3, 4]), ((180, 240), [3]), ((181, 239), [3]), ((0, 60), [0]), ((-600, 0), []), ((300, 900), [])],
+)
+def test_down_slots_boundaries(mod, interval, want):
+    t = dict(start_at=START, slots=5, slot_minutes=1)
+    assert mod._down_slots(t, [[START + interval[0], START + interval[1]]]) == want
+
+
+def test_same_numbers_in_another_unit_agree(env):
+    active(env)
+    settle(env, meter_answer([6.0] * 5))
+    env.vm.clear_mocks()
+    env.vm.mock_web(METER_RE, {"status": 200, "body": "x"})
+    env.vm.mock_llm(METER_PROMPT, meter_answer([6000] * 5, unit="MH/s"))
+    assert env.vm.run_validator() is True
+
+
+@pytest.mark.parametrize("rates", [[6.0, 6.1, 5.9, 6.2, 5.8], [9.7] * 5, [10.0, None, 10.0, None, 10.0], [25.0, 0.0, 0.0, 0.0, 0.0]])
+def test_every_accepted_reading_pays_the_same(env, mod, rates):
+    """The rule the steward set for MeterReader, applied here: two readings
+    that validators both accept must split the escrow the same way."""
+    t = dict(rate_hs=10 * GH, slot_minutes=1, start_at=START, slots=5, grace_bp=300)
+    rows = lambda vals, scale: [[i, int(round(v * scale))] for i, v in enumerate(vals) if v is not None]
+    a = {"kind": "READ", "listed": True, "rows": rows(rates, GH)}
+    b = {"kind": "READ", "listed": True, "rows": rows([None if v is None else v * 1000 for v in rates], 10**6)}
+    assert mod._same_reading(t, [], a, b)
+    sa, sb = mod._share(t, a, []), mod._share(t, b, [])
+    assert mod._payout(10 * G, 2 * G, sa["share_bp"]) == mod._payout(10 * G, 2 * G, sb["share_bp"])
+    c = {"kind": "READ", "listed": True, "rows": [[i, v + 1] for i, v in a["rows"]]}
+    if mod._same_reading(t, [], a, c):
+        assert mod._share(t, a, []) == mod._share(t, c, [])
 
 
 def test_validator_rejects_rows_outside_the_window(env):
@@ -930,7 +1105,7 @@ def test_history_is_capped(env):
 
 def test_rules_view_v2(env):
     r = env.c.get_rules()
-    assert r["grace_edge_tolerance_bp"] == 50 and r["missing_slot_counts_as"] == 0 and r["max_history"] == 100
+    assert r["evidence_agreement"].startswith("exact") and r["missing_slot_counts_as"] == 0 and r["max_history"] == 100
 
 
 def test_one_waiver_does_not_open_settlement_early(env):
