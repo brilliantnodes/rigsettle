@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paying for rented mining power without a judge: a proposal for settling hashrate rentals from the buyer&#x27;s own pool | Brilliant Nodes</title>
+<meta name="description" content="Paying for rented mining power from the pool&#x27;s own public statistics, read by independent readers, instead of trusting either side.">
+<meta property="og:title" content="Paying for rented mining power without a judge: a proposal for settling hashrate rentals from the buyer&#x27;s own pool">
+<meta property="og:description" content="Paying for rented mining power from the pool&#x27;s own public statistics, read by independent readers, instead of trusting either side.">
+<meta property="og:type" content="article">
+<style>
+  :root { --ink:#1b1d21; --muted:#5d636e; --line:#e3e5e8; --accent:#2f5bd3; --bg:#fbfbfa; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e7e8ea; --muted:#a0a6b0; --line:#2c3038; --accent:#8fb0ff; --bg:#15171b; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:18px/1.7 Georgia, "Iowan Old Style", "Times New Roman", serif; }
+  header, main, footer { max-width:720px; margin:0 auto; padding:0 22px; }
+  header { padding-top:28px; font:14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--muted); }
+  header a { color:var(--muted); text-decoration:none; }
+  header a:hover { color:var(--accent); }
+  h1 { font-size:2.1rem; line-height:1.2; margin:28px 0 8px; letter-spacing:-0.01em; }
+  h2 { font:700 1.25rem/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; margin:2.2em 0 .5em; }
+  p, li { margin:.7em 0; }
+  ul, ol { padding-left:1.4em; }
+  a { color:var(--accent); overflow-wrap:anywhere; }
+  em { color:inherit; }
+  table { border-collapse:collapse; width:100%; font-size:.9em; margin:1em 0; }
+  th, td { border-bottom:1px solid var(--line); padding:.45em .5em; text-align:left; vertical-align:top; }
+  code { font-size:.85em; }
+  footer { margin-top:48px; padding-bottom:40px; border-top:1px solid var(--line);
+           font:14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--muted); }
+  footer p { margin:14px 0 0; }
+</style>
+</head>
+<body>
+<header><a href="https://rigsettle.brilliantnodes.com/">&larr; RigSettle</a> &middot; Brilliant Nodes</header>
+<main>
+<article>
+<h1>Paying for rented mining power without a judge: a proposal for settling hashrate rentals from the buyer&#x27;s own pool</h1>
+<p><em>Brilliant Nodes · November 2026</em></p>
+<h2>Context</h2>
+<p>Proof-of-work blockchains such as Bitcoin are secured by "mining": specialised computers compete to solve a puzzle, and the winner earns newly created coins. It is a large industry. Bitcoin miners alone are projected to have earned about <strong>$17.2 billion in 2025</strong> [1].</p>
+<p>The computing power miners provide is called <strong>hashrate</strong>, and it can be rented. A rig owner can point their machines at someone else's mining account for a few hours or days, in exchange for payment. Renting is common when a new coin launches and buyers want to mine it from the first block, or when a buyer wants a burst of power without owning hardware.</p>
+<p>There are two ways to rent today:</p>
+<ul>
+<li><strong>Through a marketplace.</strong> Platforms such as NiceHash and MiningRigRentals match buyers and sellers, hold the payment, measure delivery and resolve disputes with their own staff. They charge for this: NiceHash, for example, charges buyers 3% of their spend and sellers 2% of earnings [2]. The marketplace is the judge, and you can only use the rigs and coins it supports.</li>
+<li><strong>Privately.</strong> On launch days, much renting happens in direct deals arranged on Discord, Telegram or forums. Here the buyer usually <strong>pays first and hopes</strong>.</li>
+</ul>
+<h2>Why private deals break down</h2>
+<p>In a private deal, nothing stands between the parties when something goes wrong, and something often does:</p>
+<ul>
+<li><em>"You paid for 10 GH/s and I sent 10."</em> The buyer's pool shows 6.</li>
+<li><em>"The rigs were fine; your pool was down."</em></li>
+<li><em>"The rigs mined only every other hour."</em></li>
+</ul>
+<p>Both parties can produce screenshots, but there is no neutral party to decide, and the amounts are usually too small for lawyers. The result is that private renting relies on reputation, which favours established players and makes new coin launches riskier for everyone. Marketplaces solve the problem only inside their own walls, at their own fees, and only for what they list.</p>
+<h2>A neutral meter already exists</h2>
+<p>There is already a neutral meter. When the seller's rigs mine into the <strong>buyer's</strong> mining pool, the pool publishes a worker page showing, minute by minute, how much hashrate it accepted from that worker. Neither party can edit that page: the buyer does not run the pool's software, and the seller has no access to it at all. The pool is effectively a third-party electricity meter for computing power.</p>
+<h2>An alternative approach</h2>
+<p>We propose an escrow that holds the buyer's payment (and a small bond from the seller) and divides it at the end of the rental according to what the buyer's pool recorded.</p>
+<ol>
+<li><strong>Terms first.</strong> The buyer and seller agree the pool, the worker name, the contracted hashrate, the time window, a tolerance band, and the pool's own status page for outages. The buyer locks the price; the seller locks a bond.</li>
+<li><strong>Check the meter before starting.</strong> Independent readers confirm that the worker page belongs to the named pool and can be read, before the seller commits.</li>
+<li><strong>Read the meter at the end.</strong> When the window closes, several independent machines each read the pool's worker page and copy the hashrate recorded for every minute. A reading only counts if they all arrive at <strong>exactly the same payout</strong>.</li>
+<li><strong>Fixed, published rules decide the split.</strong> Delivering more than agreed is not billed. Minutes the pool does not list count as zero, because many pools hide idle intervals and an average would otherwise pay for hours that were never mined. Small differences of 1–3%, which are normal because pools estimate hashrate statistically, are tolerated. An outage excuses the seller only if the pool's own status page reports it <strong>and</strong> the meter shows the drop.</li>
+<li><strong>No money is ever stuck.</strong> If the page cannot be read, nothing moves and anyone can retry. If the buyer's pool page goes dark after the rental, the seller is paid, because the buyer controls the pool. If nothing at all happens by a cut-off, the buyer is refunded.</li>
+</ol>
+<p>The seller receives the share of the price equal to the share of hashrate delivered, plus the same share of its bond back; the buyer receives the rest.</p>
+<p>We built the prototype on GenLayer, where several validators read the same public page independently and must agree. That gives us neutral readers without a marketplace in the middle.</p>
+<h2>Demonstrated evidence</h2>
+<p>We built fictional pool pages that produce realistic minute-by-minute numbers and ran every outcome end to end on two public test networks: a steady rig (paid 100%), a rig delivering about 60% (paid 60.26%), a rig that idled two of five minutes with the pool hiding them (paid 59.82%, not 100%), an outage with and without the status-page report, a seller who never showed (0%), a pool page that went dark, and an agreed 75% split. On the second network, five cases ran with every step agreed by five of five validators. The software passes 213 automated tests, and 63 of 63 deliberate breaks of the code were caught.</p>
+<p>These are fictional pools and test tokens. The next step is shadow runs on real pools.</p>
+<h2>Open questions</h2>
+<ol>
+<li><strong>Pool page diversity.</strong> Pools publish worker statistics in different formats and keep different lengths of history. Which pools are suitable meters, and would a standard machine-readable worker endpoint help?</li>
+<li><strong>Measurement noise.</strong> Pools estimate hashrate from submitted shares, so short windows are noisy. What tolerance band is fair for a given window length and difficulty, and can it be set statistically rather than by agreement?</li>
+<li><strong>Pool trust.</strong> The design assumes the pool is neutral. What happens when the buyer operates its own pool? Could two pools be read at once, or shares be verified directly?</li>
+<li><strong>Launch-day conditions.</strong> New coins have unstable networks, frequent forks and pools that go offline. How should outage evidence work when the status page itself is unreliable?</li>
+<li><strong>Comparing with marketplaces.</strong> Running our split alongside a marketplace's own outcome on the same rental would measure how closely they agree, and where.</li>
+<li><strong>Fees and value.</strong> For the escrow to make sense, its running cost must be well below marketplace fees. How does the cost scale with rental length and number of readings?</li>
+</ol>
+<p>We are especially interested in hearing from miners, pool operators and rental platforms.</p>
+<h2>Sources and materials</h2>
+<ol>
+<li>The Block, <em>2026 Bitcoin Mining Outlook</em> (December 2025): <a rel="noopener" href="https://www.theblock.co/post/383997/2026-bitcoin-mining-outlook">https://www.theblock.co/post/383997/2026-bitcoin-mining-outlook</a></li>
+<li>CryptoTicker, <em>NiceHash explained: miners pay a 2 percent fee on the hashrate they sell</em>: <a rel="noopener" href="https://cryptoticker.io/en/nicehash-explained/">https://cryptoticker.io/en/nicehash-explained/</a></li>
+<li>Source code and full technical documentation (open source, MIT): <a rel="noopener" href="https://github.com/brilliantnodes/rigsettle">https://github.com/brilliantnodes/rigsettle</a></li>
+<li>Video: <a rel="noopener" href="https://www.youtube.com/watch?v=f3gmJecyeSU">https://www.youtube.com/watch?v=f3gmJecyeSU</a></li>
+<li>Interactive demo: <a rel="noopener" href="https://rigsettle.brilliantnodes.com">https://rigsettle.brilliantnodes.com</a></li>
+</ol>
+<p><em>Every pool, worker and coin in the demonstration is fictional. Test tokens only.</em></p>
+</article>
+</main>
+<footer>
+<p>Written by Brilliant Nodes. Open-source prototype; test tokens only; not investment advice.
+<a href="https://rigsettle.brilliantnodes.com/">Back to RigSettle</a>.</p>
+</footer>
+</body>
+</html>
