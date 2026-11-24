@@ -97,7 +97,8 @@ def write(c, address, fn, args, value=0, acct=None):
     tx = None
     for attempt in range(3):
         try:
-            tx = c.write_contract(address=address, function_name=fn, args=args, value=value, account=acct)
+            # Studio refuses transactions without a fee distribution since late Nov 2026 (genlayer-py >= 0.19).
+            tx = c.write_contract(address=address, function_name=fn, args=args, value=value, account=acct, fees=c.estimate_transaction_fees())
             break
         except Exception:
             if attempt == 2:
