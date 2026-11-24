@@ -1,5 +1,11 @@
 import { createClient, createAccount, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
+// Since late November 2026 GenLayer Studio refuses a transaction without a fee distribution.
+// Reads stay on genlayer-js 1; every write goes through genlayer-js 2 with a fee estimate
+// (about 0.1 test GEN deposited, the unused part refunded).
+import { createClient as createWriter, createAccount as createAccountW } from "genlayer-js-studio";
+import { studionet as studionetW } from "genlayer-js-studio/chains";
+const studioFees = async (w) => { const f = await w.estimateTransactionFees(); return { distribution: f.distribution, feeValue: f.feeValue }; };
 import { NET, NETWORKS, CONTRACT_ADDRESS, NETWORK_NAME, EXPLORER_BASE, REPO_URL, DEMO, EXAMPLES } from "./config.js";
 
 // Bradbury Phase 2 needs genlayer-js 2; Studio stays on genlayer-js 1, which
@@ -98,7 +104,7 @@ function tempAccount(role, fresh = false) {
     store.set(`rigsettle.temp.${role}`, key);
   }
   const account = createAccount(key);
-  setRole(role, { client: createClient({ chain: studionet, account }), address: account.address, kind: "Temporary" });
+  setRole(role, { client: createWriter({ chain: studionetW, account: createAccountW(key) }), address: account.address, kind: "Temporary" });
   if (role === "seller") $("f-seller").value = account.address;
 }
 
@@ -176,7 +182,7 @@ document.querySelectorAll("[data-mm]").forEach((b) => b.addEventListener("click"
     if (!accounts || !accounts.length) throw new Error("The wallet returned no account.");
     const other = role === "buyer" ? roles.seller : roles.buyer;
     if (other && same(other.address, accounts[0])) throw new Error("This wallet account is already the other party. Use a temporary account for one side.");
-    setRole(role, { client: createClient({ chain: studionet, account: accounts[0] }), address: accounts[0], kind: "MetaMask" });
+    setRole(role, { client: createWriter({ chain: studionetW, account: accounts[0] }), address: accounts[0], kind: "MetaMask" });
   } catch (e) {
     showAcctError(`The wallet did not connect: ${short(e)}`);
   }
@@ -267,7 +273,7 @@ async function send(who, functionName, args, value, what) {
   $("life-note").textContent = who.kind === "MetaMask" ? "Confirm the transaction in your wallet…" : "Signing in this browser…";
   drawSteps("", false);
   $("life").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  const fire = () => who.client.writeContract({ address: CONTRACT_ADDRESS, functionName, args, value: value || 0n });
+  const fire = async () => who.client.writeContract({ address: CONTRACT_ADDRESS, functionName, args, value: value || 0n, fees: await studioFees(who.client) });
   let hash, err;
   try { hash = await fire(); } catch (e) { err = e; }
   // A temporary account signs in the page, so a send that failed on a brief
