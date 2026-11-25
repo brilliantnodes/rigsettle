@@ -125,8 +125,16 @@ def write(c, address, fn, args, value=0, acct=None):
     return tx, receipt_result(r)
 
 
-def read(c, address, fn, args=None):
-    return c.read_contract(address=address, function_name=fn, args=args or [])
+def read(c, address, fn, args=None, tries=8):
+    """A view call. Studio's gateway sometimes answers with a 503 page or an internal database error for
+    a minute or two; a read changes nothing, so it is simply asked again."""
+    for attempt in range(tries):
+        try:
+            return c.read_contract(address=address, function_name=fn, args=args or [])
+        except Exception:
+            if attempt == tries - 1:
+                raise
+            time.sleep(15)
 
 
 def deploy():
