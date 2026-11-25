@@ -21,6 +21,7 @@ A real rental from the command line (RS_KEY = the caller's key):
 terms.json holds the frozen terms; see examples/terms-hourly.example.json.
 Times are UTC ISO strings, amounts are GEN, the hashrate is GH/s.
 """
+import base64
 import json
 import os
 import sys
@@ -28,8 +29,13 @@ import time
 from pathlib import Path
 
 from genlayer_py import create_account, create_client
+from genlayer_py.abi import calldata
 from genlayer_py.chains import studionet
-from genlayer_py.types import TransactionStatus
+
+# genlayer-py 0.19 removed TransactionStatus and the receipt's status_name; the transaction is read
+# from Studio's RPC instead, which still carries "status" and the leader's receipt.
+DONE = ("ACCEPTED", "FINALIZED")
+FAILED = ("UNDETERMINED", "CANCELED", "LEADER_TIMEOUT", "VALIDATORS_TIMEOUT")
 
 ROOT = Path(__file__).resolve().parents[1]
 def _site_address() -> str:
@@ -59,17 +65,22 @@ def fund(c, address, gen=100):
     return c.provider.make_request(method="sim_fundAccount", params=[address, gen * G])
 
 
-def wait(c, tx, status=TransactionStatus.ACCEPTED, retries=200):
-    """Wait for a receipt. Studio's gateway sometimes answers 502 for a few
-    seconds; that is retried instead of treated as a failure."""
+def wait(c, tx, retries=200):
+    """Wait until the transaction is accepted or has failed, reading it from the RPC.
+    Studio's gateway sometimes answers 502 for a few seconds; that is retried
+    instead of treated as a failure."""
     deadline = time.time() + retries * 3
     last = None
     while time.time() < deadline:
         try:
-            return c.wait_for_transaction_receipt(transaction_hash=tx, status=status, interval=3000, retries=20)
-        except Exception as e:  # gateway error or still pending
+            r = c.provider.make_request(method="eth_getTransactionByHash", params=[tx])
+            r = r.get("result", r) if isinstance(r, dict) else r
+            if isinstance(r, dict) and r.get("status") in DONE + FAILED:
+                return r
+            last = (r or {}).get("status") if isinstance(r, dict) else r
+        except Exception as e:  # gateway error
             last = e
-            time.sleep(5)
+        time.sleep(4)
     raise RuntimeError(f"no receipt for {tx}: {last}")
 
 
@@ -79,14 +90,20 @@ def receipt_result(r):
     lr = lr[0] if isinstance(lr, list) and lr else lr
     lr = lr if isinstance(lr, dict) else {}
     res = lr.get("result") or {}
-    payload = res.get("payload") if isinstance(res, dict) else None
+    payload = res.get("payload") if isinstance(res, dict) else res
     if isinstance(payload, dict) and "readable" in payload:
         try:
             payload = json.loads(payload["readable"])
         except Exception:
             payload = payload["readable"]
+    elif isinstance(payload, str):  # the raw RPC gives the result base64-encoded
+        try:
+            raw = base64.b64decode(payload)
+            payload = calldata.decode(raw[1:]) if raw[:1] == b"\x00" else raw[1:].decode("utf-8", "replace")
+        except Exception:
+            pass
     return {
-        "status": r.get("status_name"),
+        "status": r.get("status") or r.get("status_name"),
         "execution": lr.get("execution_result"),
         "result": payload,
         "votes": (r.get("consensus_data") or {}).get("votes"),
@@ -116,10 +133,11 @@ def deploy():
     c, acct = client(os.environ.get("RS_KEY"))
     fund(c, acct.address, 10)
     code = (ROOT / "contracts" / "rigsettle.py").read_text()
-    tx = c.deploy_contract(code=code)
+    tx = c.deploy_contract(code=code, fees=c.estimate_transaction_fees())
     r = wait(c, tx)
     addr = r.get("to_address") or r.get("recipient")
-    print(json.dumps({"tx": tx, "address": addr, "status": r.get("status_name")}, indent=2))
+    addr = addr or (r.get("data") or {}).get("contract_address")
+    print(json.dumps({"tx": tx, "address": addr, "status": r.get("status") or r.get("status_name")}, indent=2))
     return addr
 
 
